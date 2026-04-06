@@ -1,0 +1,31 @@
+class AppUrl {
+  static const String _baseUrl = 'https://api.tapqrlink.com';
+  static const String imageUrl = 'https://api.tapqrlink.com';
+  static const String loginUrl = '$_baseUrl/login/';
+  static const String registerUrl = '$_baseUrl/register/';
+  static const String verifyOtpUrl = '$_baseUrl/verify-email/';
+  static const String verifyPasswordOtpUrl = '$_baseUrl/password-reset-code-check/';
+  static const String resandUrl = '$_baseUrl/resend-code/';
+  static const String forgetUrl = '$_baseUrl/password-reset-request/';
+  static const String setPasswordUrl = '$_baseUrl/set-initial-password/';
+  static const String changePasswordUrl = '$_baseUrl/password-reset-confirm/';
+  static const String resetPasswordUrl = '$_baseUrl/password-reset-otp/';
+  static const String profileUrl = '$_baseUrl/profile/';
+  static const String successUrl = '$_baseUrl/payments/success/';
+  static const String cancelUrl = '$_baseUrl/payments/cancel/';
+  static const String buySubscriptionUrl = '$_baseUrl/pay/user-subscriptions/subscribe/';
+  static const String notificationsUrl = '$_baseUrl/notifications/';
+  static const String historyUrl = '$_baseUrl/history/';
+  static const String scanUrl = '$_baseUrl/scan/';
+  static const String scan1Url = '$_baseUrl/unauth/scan/';
+  static const String signUpWithOtherUrl = '$_baseUrl/social/login/';
+  static const String scanFreeUrl = '$_baseUrl/free/scan/';
+  static const String guideUrl = '$_baseUrl/main/guide-videos/';
+  static const String expiryUrl = '$_baseUrl/subscription/update-expiry/';
+  static const String getProfileByIdUrl = '$_baseUrl/user/profile';
+  static const String registerFcmTokenUrl = '$_baseUrl/fcm/register/';
+  static const String getChatsUrl = '$_baseUrl/chat/rooms/';
+  static const String refreshUrl = '$_baseUrl/api/token/refresh/';
+
+
+}
