@@ -227,9 +227,11 @@ class HomeView extends GetView<HomeController> {
                           'Count: ${'login ${authController.isLoggedIn.value} sign ${authController.isSignedIn.value}'}',
                         );
 
-                        if (authController.isLoggedIn.value ||
-                            authController.isSignedIn.value ||
+                        if (!authController.isLoggedIn.value ||
+                            !authController.isSignedIn.value ||
                             revenueCatController.renewalDate.isEmpty) {
+                          print('checking things ${!authController.isLoggedIn.value} '
+                              '${!authController.isSignedIn.value} ${revenueCatController.renewalDate.isEmpty}');
                           controller.showInterstitial();
                         }
                         controller.handleScan();

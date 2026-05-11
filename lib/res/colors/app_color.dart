@@ -29,4 +29,5 @@ class AppColor {
   static const Color redColor = Color(0xFFFF0000);
   static const Color redLightColor = Color(0xFFF85252);
   static const Color orangeColor = Color(0xFFFF5900);
+  static const Color warningColor = Color(0xFFFF7C33);
 }

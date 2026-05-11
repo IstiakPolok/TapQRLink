@@ -41,14 +41,12 @@ class ClockController extends GetxController {
     reminderText.value = text;
   }
 
-  void onDone() {
-    Get.back(
-      result: {
-        'date': selectedDate.value,
-        'time': getFormattedTime(),
-        'text': reminderText.value,
-      },
-    );
+  void onDone(BuildContext context) {
+    Navigator.pop(context, {
+      'date': selectedDate.value,
+      'time': getFormattedTime(),
+      'text': reminderText.value,
+    });
   }
 
   void onCancel() {

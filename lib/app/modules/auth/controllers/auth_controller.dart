@@ -378,7 +378,7 @@ class AuthController extends GetxController {
         Get.offAllNamed(Routes.home);
       } else {
         final errorMsg =
-            response['data']['error'] ??
+            response['data']['errors'] ??
             response['data']['message'] ??
             'Invalid credentials';
         errorMessage.value = errorMsg;
@@ -408,6 +408,44 @@ class AuthController extends GetxController {
     final firstName = firstNameController.text.trim();
     final lastName = lastNameController.text.trim();
     final mobile = mobileController.text.trim();
+
+    if (firstName.isEmpty) {
+      showCustomSnackBar(
+        title: 'Warning',
+        message: 'First Name is required',
+        backgroundColor: AppColor.orangeColor,
+        isSuccess: false,
+      );
+      return;
+    }
+    if (lastName.isEmpty) {
+      showCustomSnackBar(
+        title: 'Warning',
+        message: 'Last Name is required',
+        backgroundColor: AppColor.orangeColor,
+        isSuccess: false,
+      );
+      return;
+    }
+    if (email.isEmpty) {
+      showCustomSnackBar(
+        title: 'Warning',
+        message: 'Email is required',
+        backgroundColor: AppColor.orangeColor,
+        isSuccess: false,
+      );
+      return;
+    }
+    if (mobile.isEmpty) {
+      showCustomSnackBar(
+        title: 'Warning',
+        message: 'Mobile Number is required',
+        backgroundColor: AppColor.orangeColor,
+        isSuccess: false,
+      );
+      return;
+    }
+
     debugPrint('Signing up with email: $email');
     try {
       isLoading(true);

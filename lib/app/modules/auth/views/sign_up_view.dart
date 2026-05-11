@@ -8,6 +8,7 @@ import '../../../../res/assets/image_assets.dart';
 import '../../../../res/colors/app_color.dart';
 import '../../../../widgets/custom_button.dart';
 import '../../../../widgets/input_text_widget.dart';
+import '../../../../widgets/show_custom_snack_bar.dart';
 import '../../home/views/nav_bar.dart';
 import '../../settings/controllers/settings_controller.dart';
 import '../controllers/auth_controller.dart';
@@ -210,7 +211,54 @@ class SignUpView extends GetView<AuthController> {
                         onPress: controller.isLoading.value
                             ? null
                             : () async {
-                                await controller.signup();
+                                final email = controller.signupEmailController.text.trim();
+                                final mobile = controller.mobileController.text.trim();
+
+                                if (controller.firstNameController.text.isEmpty) {
+                                  showCustomSnackBar(
+                                    title: 'Warning',
+                                    message: 'First Name is required',
+                                    backgroundColor: AppColor.orangeColor,
+                                    isSuccess: false,
+                                  );
+                                } else if (controller.lastNameController.text.isEmpty) {
+                                  showCustomSnackBar(
+                                    title: 'Warning',
+                                    message: 'Last Name is required',
+                                    backgroundColor: AppColor.orangeColor,
+                                    isSuccess: false,
+                                  );
+                                } else if (email.isEmpty) {
+                                  showCustomSnackBar(
+                                    title: 'Warning',
+                                    message: 'Email is required',
+                                    backgroundColor: AppColor.orangeColor,
+                                    isSuccess: false,
+                                  );
+                                } else if (!GetUtils.isEmail(email)) {
+                                  showCustomSnackBar(
+                                    title: 'Warning',
+                                    message: 'Please enter a valid email address',
+                                    backgroundColor: AppColor.orangeColor,
+                                    isSuccess: false,
+                                  );
+                                } else if (mobile.isEmpty) {
+                                  showCustomSnackBar(
+                                    title: 'Warning',
+                                    message: 'Mobile Number is required',
+                                    backgroundColor: AppColor.orangeColor,
+                                    isSuccess: false,
+                                  );
+                                } else if (!GetUtils.isPhoneNumber(mobile)) {
+                                  showCustomSnackBar(
+                                    title: 'Warning',
+                                    message: 'Please enter a valid mobile number',
+                                    backgroundColor: AppColor.orangeColor,
+                                    isSuccess: false,
+                                  );
+                                } else {
+                                  await controller.signup();
+                                }
                               },
                         loading: controller.isLoading.value,
                         title: 'Next',
@@ -240,7 +288,7 @@ class SignUpView extends GetView<AuthController> {
                             );
                           },
                           child: Text(
-                            'Sign Ip',
+                            'Sign In',
                             style: TextStyle(
                               color: AppColor.defaultColor,
                               fontSize: 16.sp,
