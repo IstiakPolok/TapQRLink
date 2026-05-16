@@ -15,6 +15,7 @@ import 'package:mobile_scanner/mobile_scanner.dart' as ms;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../res/app_url/app_url.dart';
 import '../../../../res/assets/image_assets.dart';
 import '../../../../res/colors/app_color.dart';
 import '../../../../res/components/api_service.dart';
@@ -51,6 +52,8 @@ class HomeController extends GetxController {
     Image.asset(ImageAssets.qrCode, fit: BoxFit.contain),
   );
   final isPlane = false.obs;
+  final RxInt adClickCount = 1.obs;
+  final String adClickCountKey = 'ad_click_count';
 
   Future<void> getCheckPopup() async {
     final popup = await storage.read(key: 'popup');
@@ -106,7 +109,7 @@ class HomeController extends GetxController {
       interstitialAd!.show();
       loadInterstitial();
     } else {
-      Get.snackbar("Ads", "Interstitial Ad not ready yet");
+      debugPrint("Interstitial Ad not ready yet");
     }
   }
 
@@ -190,7 +193,6 @@ class HomeController extends GetxController {
 
   final storageHistory = GetStorage();
   final historyKey = 'history';
-  var count = 0.obs;
 
   RxList<dynamic> historyList = <dynamic>[].obs;
 
@@ -222,19 +224,33 @@ class HomeController extends GetxController {
   Future<void> loadScanCount() async {
     var storedValue = await storage.read(key: countKey);
     if (storedValue != null) {
-      count.value = int.tryParse(storedValue.toString()) ?? 0;
+      adClickCount.value = int.tryParse(storedValue.toString()) ?? 0;
     } else {
-      count.value = 0;
+      adClickCount.value = 0;
     }
   }
 
+  Future<void> loadAdClickCount() async {
+    var storedValue = await storage.read(key: adClickCountKey);
+    if (storedValue != null) {
+      adClickCount.value = int.tryParse(storedValue.toString()) ?? 0;
+    }
+  }
+
+  Future<void> incrementAdClickCount() async {
+    adClickCount.value++;
+    await storage.write(
+      key: adClickCountKey,
+      value: adClickCount.value.toString(),
+    );
+  }
+
   Future<void> handleScan() async {
-    if (count.value >= 3 && revenueCatController.renewalDate.isEmpty) {
+    if (adClickCount.value >= 3 && revenueCatController.renewalDate.isEmpty) {
       showDialog();
       return;
-    }
-
-    if (authController.isLoggedIn.value || authController.isSignedIn.value) {
+    } else if (authController.isLoggedIn.value ||
+        authController.isSignedIn.value) {
       await scanImageFromFile();
     } else {
       await scanImageFromFile1();
@@ -299,11 +315,6 @@ class HomeController extends GetxController {
         ],
       ),
     );
-  }
-
-  Future<void> incrementScanCount() async {
-    count.value++;
-    await storage.write(key: countKey, value: count.value.toString());
   }
 
   Future<List<dynamic>> getHistory() async {
@@ -514,6 +525,7 @@ class HomeController extends GetxController {
     loadInterstitial();
     initializeScanner();
     loadScanCount();
+    loadAdClickCount();
     debugPrint('NotificationController initialized');
   }
 
@@ -528,99 +540,96 @@ class HomeController extends GetxController {
     showCustomSnackBar(title: title, message: message, isSuccess: isSuccess);
   }
 
-  Future<void> fetchHistory() async {
+  var nextPageUrl = RxnString();
+
+  Future<void> fetchHistory({bool isLoadMore = false}) async {
+    if (isLoading.value) return;
+
     try {
-      isLoading.value = true;
-      errorMessage.value = '';
-      final token = await storage.read(key: 'access');
-      if (token == null) {
-        errorMessage.value =
-            'Authentication token not found. Please log in again.';
-        showCustomSnackBar(
-          title: 'Error',
-          message: errorMessage.value,
-          isSuccess: false,
-        );
-        Get.toNamed(Routes.auth);
-        return;
-      }
-      final response = await apiService.getHistory(token);
-      if (response['statusCode'] == 200) {
-        final List<dynamic> data = response['data'];
-        historyItems.value = data
-            .map((json) => HistoryModel.fromJson(json))
-            .toList();
-        debugPrint('Fetched ${historyItems.length} history items');
-      } else if (response['statusCode'] == 401) {
-        final refreshToken = await storage.read(key: 'refresh');
-        final refreshed = await authController.refreshAccessToken(
-          refreshToken!,
-        );
-        if (refreshed) {
-          final newToken = await authController.getAccessToken();
-          if (newToken != null) {
-            final retryResponse = await apiService.getHistory(newToken);
-            if (retryResponse['statusCode'] == 200) {
-              final List<dynamic> data = retryResponse['data'];
-              historyItems.value = data
-                  .map((json) => HistoryModel.fromJson(json))
-                  .toList();
-              debugPrint(
-                'Fetched ${historyItems.length} history items after token refresh',
-              );
-            } else {
-              final errorMsg =
-                  retryResponse['data']['error'] ??
-                  'Failed to fetch history after token refresh';
-              errorMessage.value = errorMsg;
-              showCustomSnackBar(
-                title: 'Error',
-                message: errorMsg,
-                isSuccess: false,
-              );
-              debugPrint('Error: ${errorMessage.value}');
-              Get.toNamed(Routes.auth);
-            }
-          } else {
-            errorMessage.value = 'Failed to retrieve new access token';
-            showCustomSnackBar(
-              title: 'Error',
-              message: errorMessage.value,
-              isSuccess: false,
-            );
-            debugPrint('Error: ${errorMessage.value}');
-            Get.toNamed(Routes.auth);
-          }
-        } else {
-          errorMessage.value = 'Failed to refresh token. Please log in again.';
-          showCustomSnackBar(
-            title: 'Error',
-            message: errorMessage.value,
-            isSuccess: false,
-          );
-          Get.toNamed(Routes.auth);
-        }
+      if (!isLoadMore) {
+        isLoading.value = true;
+        historyItems.clear();
+        nextPageUrl.value = null;
       } else {
-        errorMessage.value =
-            response['data']['error'] ?? 'Failed to fetch history';
-        showCustomSnackBar(
-          title: 'Error',
-          message: errorMessage.value,
-          isSuccess: false,
-        );
-        debugPrint('Error: ${errorMessage.value}');
+        if (nextPageUrl.value == null) return;
+        isLoading.value = true;
+      }
+
+      final token = await storage.read(key: 'access');
+
+      final String targetUrl = isLoadMore
+          ? nextPageUrl.value!
+          : AppUrl.historyUrl;
+
+      debugPrint("🚀 Requesting URL: $targetUrl");
+
+      final response = await apiService.getHistory(token!, url: targetUrl);
+
+      if (response['statusCode'] == 200) {
+        final data = response['data'];
+
+        nextPageUrl.value = data['next'];
+
+        final List<HistoryModel> fetched = (data['results'] as List)
+            .map((e) => HistoryModel.fromJson(e))
+            .toList();
+
+        if (isLoadMore) {
+          historyItems.addAll(fetched);
+        } else {
+          historyItems.assignAll(fetched);
+        }
+      } else if (response['statusCode'] == 401) {
+        await _handleTokenRefresh(isLoadMore);
+        return;
+      } else {
+        _handleErrorResponse(response['data']);
       }
     } catch (e) {
-      errorMessage.value = 'Error fetching history: $e';
-      debugPrint('Error: $e');
-      showCustomSnackBar(
-        title: 'Error',
-        message: "Something went wrong",
-        isSuccess: false,
-      );
+      _handleErrorResponse({'error': e.toString()});
     } finally {
       isLoading.value = false;
     }
+  }
+
+  Future<void> _handleTokenRefresh(bool isLoadMore) async {
+    final refreshToken = await storage.read(key: 'refresh');
+
+    if (refreshToken == null) {
+      _handleAuthError('Session expired. Please log in again.');
+      return;
+    }
+
+    final refreshed = await authController.refreshAccessToken(refreshToken);
+
+    if (refreshed) {
+      final newToken = await authController.getAccessToken();
+      if (newToken != null) {
+        await fetchHistory(isLoadMore: isLoadMore);
+      } else {
+        _handleAuthError('Failed to retrieve new access token.');
+      }
+    } else {
+      _handleAuthError('Failed to refresh session. Please log in again.');
+    }
+  }
+
+  void _handleErrorResponse(Map<String, dynamic> data) {
+    final errorMsg =
+        data['non_field_errors']?.toString() ??
+        data['message']?.toString() ??
+        data['detail']?.toString() ??
+        data['error']?.toString() ??
+        'An unknown error occurred';
+
+    errorMessage.value = errorMsg;
+    showCustomSnackBar(title: 'Error', message: errorMsg, isSuccess: false);
+  }
+
+  void _handleAuthError(String msg) {
+    errorMessage.value = msg;
+    showCustomSnackBar(title: 'Error', message: msg, isSuccess: false);
+    Get.offAllNamed(Routes.auth);
   }
 
   Future<void> _launchLink(String url) async {
@@ -1131,89 +1140,65 @@ class HomeController extends GetxController {
     }
   }
 
-  Future<void> fetchNotifications() async {
-    try {
-      isLoading.value = true;
-      errorMessage.value = '';
-      final token = await storage.read(key: 'access');
-      if (token == null) {
-        errorMessage.value =
-            'Authentication token not found. Please log in again.';
+  var nextNotificationUrl = RxnString();
 
-        Get.toNamed(Routes.auth);
-        return;
+  Future<void> fetchNotifications({bool isLoadMore = false}) async {
+    if (isLoading.value) return;
+
+    try {
+      if (!isLoadMore) {
+        isLoading.value = true;
+        notifications.clear();
+        nextNotificationUrl.value = null;
+      } else {
+        if (nextNotificationUrl.value == null) return;
+        isLoading.value = true;
       }
-      final response = await apiService.getNotifications(token);
+
+      final token = await storage.read(key: 'access');
+
+      final String targetUrl = isLoadMore
+          ? nextNotificationUrl.value!
+          : AppUrl.notificationsUrl;
+
+      final response = await apiService.getNotifications(
+        token!,
+        url: targetUrl,
+      );
+
       if (response['statusCode'] == 200) {
-        final List<dynamic> data = response['data'];
-        notifications.value = data
+        final data = response['data'];
+
+        nextNotificationUrl.value = data['next'];
+
+        final List<NotificationModel> fetchedItems = (data['results'] as List)
             .map((json) => NotificationModel.fromJson(json))
             .toList();
-        debugPrint('Fetched ${notifications.length} notifications');
-      } else if (response['statusCode'] == 401) {
-        final refreshToken = await storage.read(key: 'refresh');
-        final refreshed = await authController.refreshAccessToken(
-          refreshToken!,
-        );
-        if (refreshed) {
-          final newToken = await authController.getAccessToken();
-          if (newToken != null) {
-            final retryResponse = await apiService.getNotifications(newToken);
-            if (retryResponse['statusCode'] == 200) {
-              final List<dynamic> data = retryResponse['data'];
-              notifications.value = data
-                  .map((json) => NotificationModel.fromJson(json))
-                  .toList();
-              debugPrint(
-                'Fetched ${notifications.length} notifications after token refresh',
-              );
-            } else {
-              final errorMsg =
-                  retryResponse['data']['error'] ??
-                  'Failed to fetch notifications after token refresh';
-              errorMessage.value = errorMsg;
-              _showSnackBar(
-                title: 'Error',
-                message: errorMsg,
-                isSuccess: false,
-              );
-              Get.toNamed(Routes.auth);
-            }
-          } else {
-            errorMessage.value = 'Failed to retrieve new access token';
-            _showSnackBar(
-              title: 'Error',
-              message: errorMessage.value,
-              isSuccess: false,
-            );
-            Get.toNamed(Routes.auth);
-          }
+
+        if (isLoadMore) {
+          notifications.addAll(fetchedItems);
         } else {
-          errorMessage.value = 'Failed to refresh token. Please log in again.';
-          _showSnackBar(
-            title: 'Error',
-            message: errorMessage.value,
-            isSuccess: false,
-          );
-          Get.toNamed(Routes.auth);
+          notifications.assignAll(fetchedItems);
         }
+      } else if (response['statusCode'] == 401) {
+        await _handleNotificationTokenRefresh(isLoadMore);
       } else {
-        errorMessage.value =
-            response['data']['error'] ??
-            response['data'] ??
-            'Failed to fetch notifications';
-        debugPrint('Failed to fetch notifications');
-        _showSnackBar(
-          title: 'Error',
-          message: errorMessage.value,
-          isSuccess: false,
-        );
+        _handleErrorResponse(response['data']);
       }
     } catch (e) {
-      errorMessage.value = 'Error fetching notifications: $e';
-      debugPrint('Error: $e');
+      debugPrint('Notification Fetch Error: $e');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> _handleNotificationTokenRefresh(bool isLoadMore) async {
+    final refreshToken = await storage.read(key: 'refresh');
+    final refreshed = await authController.refreshAccessToken(refreshToken!);
+    if (refreshed) {
+      await fetchNotifications(isLoadMore: isLoadMore);
+    } else {
+      _handleAuthError('Session expired. Please log in again.');
     }
   }
 
@@ -1356,7 +1341,7 @@ class HomeController extends GetxController {
         if (response['statusCode'] == 201) {
           qrResponse.value = response['data'];
           qrCode.value = response['data']['link'] ?? '';
-          await incrementScanCount();
+          await incrementAdClickCount();
           Get.to(() => const QrCodeView());
         } else if (response['statusCode'] == 401) {
           final refreshToken = await storage.read(key: 'refresh');
@@ -1370,8 +1355,7 @@ class HomeController extends GetxController {
               if (retryResponse['statusCode'] == 201) {
                 qrResponse.value = retryResponse['data'];
                 qrCode.value = retryResponse['data']['link'] ?? '';
-
-                await incrementScanCount();
+                await incrementAdClickCount();
                 Get.to(() => const QrCodeView());
               } else {
                 final errorMsg =
@@ -1458,7 +1442,7 @@ class HomeController extends GetxController {
         if (response['statusCode'] == 200) {
           qrResponse.value = response['data'];
           qrCode.value = response['data']['link'] ?? '';
-          await incrementScanCount();
+          await incrementAdClickCount();
           Get.to(() => const QrCodeView());
         } else {
           final error = response['data']['error'];

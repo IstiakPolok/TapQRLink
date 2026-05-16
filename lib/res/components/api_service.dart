@@ -224,12 +224,8 @@ class ApiService extends GetxService {
       final responseBody = await response.stream.bytesToString();
       debugPrint('response body $responseBody');
       return {
-        'statusCode': response.statusCode == 200 || response.statusCode == 201
-            ? response.statusCode
-            : 500,
-        'data': response.statusCode == 200 || response.statusCode == 201
-            ? jsonDecode(responseBody)
-            : {},
+        'statusCode': response.statusCode,
+        'data': jsonDecode(responseBody),
       };
     } catch (e) {
       return {
@@ -265,15 +261,17 @@ class ApiService extends GetxService {
     }
   }
 
-  Future<Map<String, dynamic>> getHistory(String token) async {
+  Future<Map<String, dynamic>> getHistory(String token, {String? url}) async {
     try {
       final response = await http.get(
-        Uri.parse(AppUrl.historyUrl),
+        Uri.parse(url ?? AppUrl.historyUrl),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
       );
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
       return {
         'statusCode': response.statusCode,
         'data': jsonDecode(response.body),
@@ -328,17 +326,20 @@ class ApiService extends GetxService {
     }
   }
 
-  Future<Map<String, dynamic>> getNotifications(String token) async {
+  Future<Map<String, dynamic>> getNotifications(
+    String token, {
+    String? url,
+  }) async {
     try {
       final response = await http.get(
-        Uri.parse(AppUrl.notificationsUrl),
+        Uri.parse(url ?? AppUrl.notificationsUrl),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
       );
-      debugPrint('url ${AppUrl.notificationsUrl}');
-      debugPrint('data ${response.body}');
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
       return {
         'statusCode': response.statusCode,
         'data': jsonDecode(response.body),

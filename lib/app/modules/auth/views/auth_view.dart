@@ -216,68 +216,7 @@ class AuthView extends GetView<AuthController> {
                     Obx(
                       () => CustomButton(
                         onPress: () async {
-                          final email = controller.emailController.text.trim();
-                          final password = controller.passwordController.text;
-
-                          if (email.isEmpty) {
-                            showCustomSnackBar(
-                              title: 'Warning',
-                              message: 'Email is required',
-                              backgroundColor: AppColor.orangeColor,
-                              isSuccess: false,
-                            );
-                          } else if (!GetUtils.isEmail(email)) {
-                            showCustomSnackBar(
-                              title: 'Warning',
-                              message: 'Please enter a valid email address',
-                              backgroundColor: AppColor.orangeColor,
-                              isSuccess: false,
-                            );
-                          } else if (password.isEmpty) {
-                            showCustomSnackBar(
-                              title: 'Warning',
-                              message: 'Password is required',
-                              backgroundColor: AppColor.orangeColor,
-                              isSuccess: false,
-                            );
-                          } else if (password.length < 6) {
-                            showCustomSnackBar(
-                              title: 'Warning',
-                              message: 'Password must be at least 6 characters',
-                              backgroundColor: AppColor.orangeColor,
-                              isSuccess: false,
-                            );
-                          } else if (!password.contains(RegExp(r'[A-Z]'))) {
-                            showCustomSnackBar(
-                              title: 'Warning',
-                              message: 'Password must contain at least one uppercase letter',
-                              backgroundColor: AppColor.orangeColor,
-                              isSuccess: false,
-                            );
-                          } else if (!password.contains(RegExp(r'[a-z]'))) {
-                            showCustomSnackBar(
-                              title: 'Warning',
-                              message: 'Password must contain at least one lowercase letter',
-                              backgroundColor: AppColor.orangeColor,
-                              isSuccess: false,
-                            );
-                          } else if (!password.contains(RegExp(r'[0-9]'))) {
-                            showCustomSnackBar(
-                              title: 'Warning',
-                              message: 'Password must contain at least one numeric character',
-                              backgroundColor: AppColor.orangeColor,
-                              isSuccess: false,
-                            );
-                          } else if (!password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) {
-                            showCustomSnackBar(
-                              title: 'Warning',
-                              message: 'Password must contain at least one special character',
-                              backgroundColor: AppColor.orangeColor,
-                              isSuccess: false,
-                            );
-                          } else {
-                            await controller.login();
-                          }
+                          await controller.login();
                         },
                         loading: controller.isLoading.value,
                         title: 'Log In',

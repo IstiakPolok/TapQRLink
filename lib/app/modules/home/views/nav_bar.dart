@@ -20,7 +20,12 @@ class Navbar extends StatelessWidget {
 
   final labels = ['Scan', 'Notification', 'History', 'Settings'];
 
-  final pages = [HomeView(), NotificationView(), HistoryView(), SettingsView()];
+  final pages = [
+    const HomeView(),
+    NotificationView(),
+    HistoryView(),
+    SettingsView(),
+  ];
 
   Navbar({super.key});
 

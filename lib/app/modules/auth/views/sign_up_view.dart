@@ -211,48 +211,13 @@ class SignUpView extends GetView<AuthController> {
                         onPress: controller.isLoading.value
                             ? null
                             : () async {
-                                final email = controller.signupEmailController.text.trim();
-                                final mobile = controller.mobileController.text.trim();
-
-                                if (controller.firstNameController.text.isEmpty) {
+                                final mobile = controller.mobileController.text
+                                    .trim();
+                                if (!GetUtils.isPhoneNumber(mobile)) {
                                   showCustomSnackBar(
                                     title: 'Warning',
-                                    message: 'First Name is required',
-                                    backgroundColor: AppColor.orangeColor,
-                                    isSuccess: false,
-                                  );
-                                } else if (controller.lastNameController.text.isEmpty) {
-                                  showCustomSnackBar(
-                                    title: 'Warning',
-                                    message: 'Last Name is required',
-                                    backgroundColor: AppColor.orangeColor,
-                                    isSuccess: false,
-                                  );
-                                } else if (email.isEmpty) {
-                                  showCustomSnackBar(
-                                    title: 'Warning',
-                                    message: 'Email is required',
-                                    backgroundColor: AppColor.orangeColor,
-                                    isSuccess: false,
-                                  );
-                                } else if (!GetUtils.isEmail(email)) {
-                                  showCustomSnackBar(
-                                    title: 'Warning',
-                                    message: 'Please enter a valid email address',
-                                    backgroundColor: AppColor.orangeColor,
-                                    isSuccess: false,
-                                  );
-                                } else if (mobile.isEmpty) {
-                                  showCustomSnackBar(
-                                    title: 'Warning',
-                                    message: 'Mobile Number is required',
-                                    backgroundColor: AppColor.orangeColor,
-                                    isSuccess: false,
-                                  );
-                                } else if (!GetUtils.isPhoneNumber(mobile)) {
-                                  showCustomSnackBar(
-                                    title: 'Warning',
-                                    message: 'Please enter a valid mobile number',
+                                    message:
+                                        'Please enter a valid mobile number',
                                     backgroundColor: AppColor.orangeColor,
                                     isSuccess: false,
                                   );

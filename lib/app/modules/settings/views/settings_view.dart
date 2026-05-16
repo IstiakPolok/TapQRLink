@@ -1,8 +1,10 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
 import 'package:qr_code/app/routes/app_pages.dart';
+import 'package:shimmer/shimmer.dart';
 
 import '../../../../res/assets/image_assets.dart';
 import '../../../../res/colors/app_color.dart';
@@ -48,18 +50,18 @@ class SettingsView extends GetView<SettingsController> {
                   children: [
                     SizedBox(height: 40.h),
                     Obx(() {
-                      if (profileController.isLoading.value) {
-                        return Center(child: CircularProgressIndicator());
-                      }
                       if (profileController.errorMessage.value.isNotEmpty) {
-                        return Center(
-                          child: Text(
-                            'No Profile available',
-                            style: TextStyle(
-                              fontSize: 16.sp,
-                              color: controller.isDarkMode.value
-                                  ? AppColor.whiteColor
-                                  : AppColor.textColor,
+                        return SizedBox(
+                          height: 102.h,
+                          child: Center(
+                            child: Text(
+                              'No Profile available',
+                              style: TextStyle(
+                                fontSize: 16.sp,
+                                color: controller.isDarkMode.value
+                                    ? AppColor.whiteColor
+                                    : AppColor.textColor,
+                              ),
                             ),
                           ),
                         );
@@ -68,12 +70,12 @@ class SettingsView extends GetView<SettingsController> {
                         children: [
                           Obx(() {
                             if (profileController.isLoading.value) {
-                              return CircleAvatar(
-                                radius: 60.r,
-                                backgroundColor: AppColor.backgroundColor,
-                                child: CircularProgressIndicator(
-                                  color: AppColor.defaultColor,
-                                  strokeWidth: 3,
+                              return Shimmer.fromColors(
+                                baseColor: Colors.grey[300]!,
+                                highlightColor: Colors.grey[100]!,
+                                child: CircleAvatar(
+                                  radius: 60.r,
+                                  backgroundColor: Colors.white,
                                 ),
                               );
                             }
@@ -88,31 +90,28 @@ class SettingsView extends GetView<SettingsController> {
                               backgroundColor: AppColor.backgroundColor,
                               child: ClipOval(
                                 child: hasImage
-                                    ? Image.network(
-                                        profile.profilePicture,
+                                    ? CachedNetworkImage(
+                                        imageUrl: profile.profilePicture,
                                         fit: BoxFit.cover,
                                         width: double.infinity,
                                         height: double.infinity,
-                                        errorBuilder:
-                                            (context, error, stackTrace) =>
-                                                SvgPicture.asset(
-                                                  ImageAssets.img,
-                                                  fit: BoxFit.cover,
-                                                  width: double.infinity,
-                                                  height: double.infinity,
-                                                ),
-                                        loadingBuilder:
-                                            (context, child, loadingProgress) {
-                                              if (loadingProgress == null) {
-                                                return child;
-                                              }
-                                              return Center(
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                    ),
-                                              );
-                                            },
+                                        placeholder: (context, url) =>
+                                            Shimmer.fromColors(
+                                              baseColor: Colors.grey[300]!,
+                                              highlightColor: Colors.grey[100]!,
+                                              child: Container(
+                                                width: double.infinity,
+                                                height: double.infinity,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                        errorWidget: (context, url, error) =>
+                                            SvgPicture.asset(
+                                              ImageAssets.img,
+                                              fit: BoxFit.cover,
+                                              width: double.infinity,
+                                              height: double.infinity,
+                                            ),
                                       )
                                     : SvgPicture.asset(
                                         ImageAssets.img,
@@ -124,17 +123,37 @@ class SettingsView extends GetView<SettingsController> {
                             );
                           }),
                           SizedBox(height: 10.h),
-                          Text(
-                            '${profileController.profile.value?.firstName ?? ''} ${profileController.profile.value?.lastName ?? ''}',
-                            style: TextStyle(
-                              color: controller.isDarkMode.value
-                                  ? AppColor.whiteColor
-                                  : AppColor.textColor1,
-                              fontSize: 16.sp,
-                              fontFamily: 'Nunito Sans',
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
+
+                          Obx(() {
+                            if (profileController.isLoading.value) {
+                              return Shimmer.fromColors(
+                                baseColor: Colors.grey[300]!,
+                                highlightColor: Colors.grey[100]!,
+                                child: Container(
+                                  height: 16.h,
+                                  width: 120.w,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(4.r),
+                                  ),
+                                ),
+                              );
+                            }
+
+                            final profile = profileController.profile.value;
+                            return Text(
+                              '${profile?.firstName ?? ''} ${profile?.lastName ?? ''}'
+                                  .trim(),
+                              style: TextStyle(
+                                color: controller.isDarkMode.value
+                                    ? AppColor.whiteColor
+                                    : AppColor.textColor1,
+                                fontSize: 16.sp,
+                                fontFamily: 'Nunito Sans',
+                                fontWeight: FontWeight.w500,
+                              ),
+                            );
+                          }),
                         ],
                       );
                     }),
@@ -160,8 +179,6 @@ class SettingsView extends GetView<SettingsController> {
                         ),
                         SizedBox(height: 13.h),
                         item('Dark Mode', ImageAssets.dark, true, null),
-                        SizedBox(height: 13.h),
-                        item('App Info', ImageAssets.info, false, null),
                       ],
                     ),
                   ],

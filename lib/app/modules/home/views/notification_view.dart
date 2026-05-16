@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
+import 'package:shimmer/shimmer.dart';
 
 import '../../../../res/assets/image_assets.dart';
 import '../../../../res/colors/app_color.dart';
@@ -10,189 +11,99 @@ import '../../auth/controllers/auth_controller.dart';
 import '../controllers/home_controller.dart';
 
 class NotificationView extends GetView<HomeController> {
-  const NotificationView({super.key});
+  final ScrollController _scrollController = ScrollController();
+
+  NotificationView({super.key}) {
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 100) {
+        if (!controller.isLoading.value &&
+            controller.nextNotificationUrl.value != null) {
+          debugPrint(
+            "Loading next notifications: ${controller.nextNotificationUrl.value}",
+          );
+          controller.fetchNotifications(isLoadMore: true);
+        }
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final AuthController authController = Get.find();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (authController.isSignedIn.value == true ||
-          authController.isLoggedIn.value == true) {
+      if ((authController.isSignedIn.value ||
+              authController.isLoggedIn.value) &&
+          controller.notifications.isEmpty &&
+          !controller.isLoading.value) {
         controller.fetchNotifications();
       }
     });
-    return Obx(
-      () => Scaffold(
-        body: SafeArea(
-          child: Padding(
-            padding: EdgeInsets.all(20.sp),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                SizedBox(height: 20.h),
-                Center(
-                  child: Text(
-                    'Notifications',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Get.isDarkMode
-                          ? AppColor.whiteColor
-                          : AppColor.textColor,
-                      fontSize: 24.sp,
-                      fontFamily: 'Nunito Sans',
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 50.h),
-                Expanded(
-                  child:
-                      !(authController.isSignedIn.value ||
-                          authController.isLoggedIn.value)
-                      ? Center(
-                          child: Text(
-                            'Please sign in to view notifications',
-                            style: TextStyle(
-                              fontSize: 16.sp,
-                              color: Get.isDarkMode
-                                  ? AppColor.whiteColor
-                                  : AppColor.textColor,
-                            ),
-                          ),
-                        )
-                      : controller.isLoading.value
-                      ? const Center(child: CircularProgressIndicator())
-                      : controller.notifications.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'No notifications available',
-                                style: TextStyle(
-                                  fontSize: 16.sp,
-                                  color: Get.isDarkMode
-                                      ? AppColor.whiteColor
-                                      : AppColor.textColor,
-                                ),
-                              ),
-                              SizedBox(height: 50.h),
-                            ],
-                          ),
-                        )
-                      : SingleChildScrollView(
-                          child: Column(
-                            children: controller.notifications
-                                .asMap()
-                                .entries
-                                .map((entry) {
-                                  final notification = entry.value;
-                                  return history(
-                                    notification.title,
-                                    notification.message,
-                                    () => controller.showNotificationDetails(
-                                      notification.id,
-                                    ),
-                                    () => deleteDialog(notification.id),
-                                  );
-                                })
-                                .toList(),
-                          ),
-                        ),
-                ),
-              ],
-            ),
+
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.all(20.sp),
+          child: Column(
+            children: [
+              SizedBox(height: 20.h),
+              Text(
+                'Notifications',
+                style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.w600),
+              ),
+              SizedBox(height: 50.h),
+              Expanded(
+                child: Obx(() {
+                  bool isAuth =
+                      authController.isSignedIn.value ||
+                      authController.isLoggedIn.value;
+
+                  if (!isAuth) {
+                    return const Center(
+                      child: Text('Please sign in to view notifications'),
+                    );
+                  }
+
+                  if (controller.isLoading.value &&
+                      controller.notifications.isEmpty) {
+                    return ListView.builder(
+                      itemCount: 10,
+                      itemBuilder: (_, _) => _shimmerItem(),
+                    );
+                  }
+
+                  if (controller.notifications.isEmpty) {
+                    return const Center(
+                      child: Text('No notifications available'),
+                    );
+                  }
+
+                  return ListView.builder(
+                    controller: _scrollController,
+                    itemCount:
+                        controller.notifications.length +
+                        (controller.nextNotificationUrl.value != null ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index < controller.notifications.length) {
+                        final item = controller.notifications[index];
+                        return notificationItem(
+                          item.title,
+                          item.message,
+                          () => controller.showNotificationDetails(item.id),
+                          () => deleteDialog(item.id),
+                        );
+                      } else {
+                        return _shimmerItem();
+                      }
+                    },
+                  );
+                }),
+              ),
+            ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget history(
-    String title,
-    String message,
-    VoidCallback onTap,
-    VoidCallback onDelete,
-  ) {
-    return Column(
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: onTap,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SvgPicture.asset(
-                      ImageAssets.notify1,
-                      width: 24.w,
-                      height: 24.h,
-                    ),
-                    SizedBox(width: 10.w),
-                    Expanded(
-                      child: Text(
-                        '$title: $message',
-                        style: TextStyle(
-                          color: Get.isDarkMode
-                              ? AppColor.whiteColor
-                              : AppColor.textColor,
-                          fontSize: 16.sp,
-                          fontFamily: 'Nunito Sans',
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            GestureDetector(
-              onTap: onDelete,
-              child: Column(
-                children: [
-                  SvgPicture.asset(
-                    ImageAssets.delete,
-                    width: 25.w,
-                    height: 30.h,
-                  ),
-                  Text(
-                    'Delete',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Get.isDarkMode
-                          ? AppColor.whiteColor
-                          : AppColor.textColor2,
-                      fontSize: 12.sp,
-                      fontFamily: 'Nunito Sans',
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: 15.h),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 9.w),
-          child: Container(
-            width: double.infinity,
-            decoration: ShapeDecoration(
-              shape: RoundedRectangleBorder(
-                side: BorderSide(
-                  width: .5.w,
-                  strokeAlign: BorderSide.strokeAlignCenter,
-                  color: AppColor.borderColor,
-                ),
-              ),
-            ),
-          ),
-        ),
-        SizedBox(height: 20.h),
-      ],
     );
   }
 
@@ -261,6 +172,89 @@ class NotificationView extends GetView<HomeController> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _shimmerItem() {
+    return Shimmer.fromColors(
+      baseColor: Get.isDarkMode ? Colors.grey[800]! : Colors.grey[300]!,
+      highlightColor: Get.isDarkMode ? Colors.grey[700]! : Colors.grey[100]!,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: 20.h),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(width: 24.w, height: 24.h, color: Colors.white),
+            SizedBox(width: 10.w),
+            Expanded(
+              child: Column(
+                spacing: 4.h,
+                children: [
+                  Container(
+                    margin: EdgeInsets.only(right: 50.w),
+                    height: 16.h,
+                    color: Colors.white,
+                  ),
+                  Container(
+                    margin: EdgeInsets.only(right: 50.w),
+                    height: 16.h,
+                    color: Colors.white,
+                  ),
+                  Container(
+                    margin: EdgeInsets.only(right: 100.w),
+                    height: 16.h,
+                    color: Colors.white,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget notificationItem(
+    String title,
+    String message,
+    VoidCallback onTap,
+    VoidCallback onDelete,
+  ) {
+    return Column(
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: onTap,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SvgPicture.asset(ImageAssets.notify1, width: 24.w),
+                    SizedBox(width: 10.w),
+                    Expanded(
+                      child: Text(
+                        '$title: $message',
+                        style: TextStyle(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: onDelete,
+              icon: SvgPicture.asset(ImageAssets.delete, width: 25.w),
+            ),
+          ],
+        ),
+        const Divider(),
+        SizedBox(height: 10.h),
+      ],
     );
   }
 }

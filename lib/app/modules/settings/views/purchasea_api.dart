@@ -1,5 +1,3 @@
-// ignore_for_file: deprecated_member_use
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -25,8 +23,13 @@ class PurchaseApi {
     }
   }
 
-  static Future<bool> purchasePackage(Package package) async {
+  static Future<bool> purchasePackage(
+    BuildContext context,
+    Package package,
+  ) async {
     try {
+      Navigator.pop(context);
+      // ignore: deprecated_member_use
       await Purchases.purchasePackage(package);
       return true;
     } catch (e) {

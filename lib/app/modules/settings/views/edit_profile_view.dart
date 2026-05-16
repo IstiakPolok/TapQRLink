@@ -1,7 +1,11 @@
+import 'dart:io';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
+import 'package:shimmer/shimmer.dart';
 
 import '../../../../res/assets/image_assets.dart';
 import '../../../../res/colors/app_color.dart';
@@ -57,84 +61,52 @@ class EditProfileView extends GetView<SettingsController> {
                           SizedBox(height: 10.h),
                           Center(
                             child: Stack(
+                              alignment: Alignment.center,
                               children: [
                                 Obx(() {
                                   profileController.pickedImage.value =
                                       as.pickedImage.value;
                                   final pickedImage =
                                       profileController.pickedImage.value;
-                                  return ClipRRect(
-                                    borderRadius: BorderRadius.circular(200.r),
-                                    child: pickedImage != null
-                                        ? Image.file(
-                                            pickedImage,
-                                            width: 120.w,
-                                            height: 120.w,
-                                            fit: BoxFit.cover,
-                                            errorBuilder:
-                                                (context, error, stackTrace) {
-                                                  return SvgPicture.asset(
-                                                    ImageAssets.img,
-                                                    width: 120.w,
-                                                    height: 120.w,
-                                                    fit: BoxFit.cover,
-                                                  );
-                                                },
-                                          )
-                                        : profileController
-                                              .profile
-                                              .value!
-                                              .profilePicture
-                                              .isNotEmpty
-                                        ? Container(
-                                            width: 120.w,
-                                            height: 120.w,
-                                            color: AppColor.defaultColor,
-                                            child: Image.network(
-                                              profileController
-                                                  .profile
-                                                  .value!
-                                                  .profilePicture,
-                                              fit: BoxFit.cover,
-                                            ),
-                                          )
-                                        : Container(
-                                            width: 120.w,
-                                            height: 120.w,
-                                            color: AppColor.defaultColor,
-                                            child: SvgPicture.asset(
-                                              ImageAssets.img,
-                                              fit: BoxFit.cover,
-                                            ),
-                                          ),
-                                  );
-                                }),
-                                Positioned(
-                                  bottom: 0.h,
-                                  right: 0.w,
-                                  child: Container(
-                                    width: 30.w,
-                                    height: 30.w,
-                                    decoration: BoxDecoration(
-                                      color: AppColor.buttonColor,
-                                      borderRadius: BorderRadius.circular(
-                                        100.r,
+                                  final profile =
+                                      profileController.profile.value;
+                                  final networkUrl =
+                                      profile?.profilePicture ?? '';
+
+                                  return ClipOval(
+                                    child: SizedBox(
+                                      width: 120.w,
+                                      height: 120.w,
+                                      child: _buildImageContent(
+                                        pickedImage,
+                                        networkUrl,
                                       ),
                                     ),
-                                    child: Center(
-                                      child: IconButton(
-                                        icon: Icon(
-                                          Icons.camera_alt,
-                                          size: 18.sp,
-                                          color:
-                                              controller.isDarkMode.value ==
-                                                  false
-                                              ? AppColor.backgroundColor
-                                              : AppColor.darkThemeColor,
+                                  );
+                                }),
+
+                                Positioned(
+                                  bottom: 5.h,
+                                  right: 5.w,
+                                  child: GestureDetector(
+                                    onTap: as.getBottomSheet,
+                                    child: Container(
+                                      width: 34.w,
+                                      height: 34.w,
+                                      decoration: BoxDecoration(
+                                        color: AppColor.buttonColor,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 2.w,
                                         ),
-                                        onPressed: as.getBottomSheet,
-                                        padding: EdgeInsets.all(4.w),
-                                        constraints: BoxConstraints(),
+                                      ),
+                                      child: Icon(
+                                        Icons.camera_alt,
+                                        size: 18.sp,
+                                        color: controller.isDarkMode.value
+                                            ? AppColor.darkThemeColor
+                                            : AppColor.backgroundColor,
                                       ),
                                     ),
                                   ),
@@ -274,6 +246,38 @@ class EditProfileView extends GetView<SettingsController> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildImageContent(File? pickedImage, String networkUrl) {
+    if (pickedImage != null) {
+      return Image.file(
+        pickedImage,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _errorAsset(),
+      );
+    }
+
+    if (networkUrl.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: networkUrl,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => Shimmer.fromColors(
+          baseColor: Colors.grey[300]!,
+          highlightColor: Colors.grey[100]!,
+          child: Container(color: Colors.white),
+        ),
+        errorWidget: (context, url, error) => _errorAsset(),
+      );
+    }
+
+    return _errorAsset();
+  }
+
+  Widget _errorAsset() {
+    return Container(
+      color: AppColor.defaultColor.withAlpha(26),
+      child: SvgPicture.asset(ImageAssets.img, fit: BoxFit.cover),
     );
   }
 }

@@ -66,8 +66,7 @@ class UpgradeView extends GetView<SettingsController> {
                         ),
                       ),
                       SizedBox(height: 30.h),
-                      // Pass index to the plan widget
-                      plan('1 Year', 35.99, 'Yearly', 1),
+                      plan(context, '1 Year', 35.99, 'Yearly', 1),
                       SizedBox(height: 25.h),
                       Text(
                         'Premium Features',
@@ -136,7 +135,6 @@ class UpgradeView extends GetView<SettingsController> {
     const String subject = 'Support Request';
     const String body = 'Please describe your issue.';
 
-    // Gmail intent URI (forces Gmail if installed)
     final Uri gmailUri = Uri.parse(
       'intent://sendto/$email'
       '?subject=${Uri.encodeComponent(subject)}'
@@ -144,7 +142,6 @@ class UpgradeView extends GetView<SettingsController> {
       '#Intent;package=com.google.android.gm;end',
     );
 
-    // Default email client
     final Uri emailLaunchUri = Uri(
       scheme: 'mailto',
       path: email,
@@ -154,13 +151,10 @@ class UpgradeView extends GetView<SettingsController> {
 
     try {
       if (await canLaunchUrl(gmailUri)) {
-        // ✅ Try Gmail app first
         await launchUrl(gmailUri, mode: LaunchMode.externalApplication);
       } else if (await canLaunchUrl(emailLaunchUri)) {
-        // ✅ Fallback to default email client
         await launchUrl(emailLaunchUri, mode: LaunchMode.externalApplication);
       } else {
-        // ✅ Final fallback (raw mailto)
         await launchUrl(
           Uri.parse('mailto:$email'),
           mode: LaunchMode.externalApplication,
@@ -177,13 +171,17 @@ class UpgradeView extends GetView<SettingsController> {
     }
   }
 
-  // Modified plan widget to accept index and controller for selected index
-  Widget plan(String title, double price, String duration, int index) {
+  Widget plan(
+    BuildContext context,
+    String title,
+    double price,
+    String duration,
+    int index,
+  ) {
     return GestureDetector(
       onTap: () {
-        // Update the selected plan index and show the dialog
         controller.selectedPlanIndex.value = index;
-        showUpgradeDialog();
+        showUpgradeDialog(context);
       },
       child: Obx(
         () => Container(
@@ -193,7 +191,7 @@ class UpgradeView extends GetView<SettingsController> {
           decoration: ShapeDecoration(
             color: controller.selectedPlanIndex.value == index
                 ? AppColor.defaultColor
-                : AppColor.containerColor, // Change color based on selection
+                : AppColor.containerColor,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16.r),
             ),
@@ -293,7 +291,7 @@ class UpgradeView extends GetView<SettingsController> {
     );
   }
 
-  void showUpgradeDialog() {
+  void showUpgradeDialog(BuildContext context) {
     final AuthController authController = Get.find();
     Get.dialog(
       AlertDialog(
@@ -342,9 +340,7 @@ class UpgradeView extends GetView<SettingsController> {
                     Navigator.pop(Get.context!);
                     if (authController.isLoggedIn.value ||
                         authController.isSignedIn.value) {
-                      // If logged in or signed in, proceed with subscription creation
-                      // Get.to(PaywallPage());
-                      await fetchOffers();
+                      await fetchOffers(context);
                     } else {
                       showCustomSnackBar(
                         title: 'Lon In First',
@@ -367,10 +363,8 @@ class UpgradeView extends GetView<SettingsController> {
     );
   }
 
-  Future<void> fetchOffers() async {
+  Future<void> fetchOffers(BuildContext context) async {
     final offerings = await PurchaseApi.fetchOffers();
-
-    // 1. Fix logic: If offerings is EMPTY, show the error
     if (offerings.isEmpty) {
       ScaffoldMessenger.of(
         Get.context!,
@@ -378,14 +372,11 @@ class UpgradeView extends GetView<SettingsController> {
       return;
     }
 
-    // 2. Extract packages
     final packages = offerings
         .map((offer) => offer.availablePackages)
         .expand((element) => element)
         .toList();
 
-    // 3. Fix 'Utils' error.
-    // If you don't have a Utils class, use Get.bottomSheet for GetX projects:
     Get.bottomSheet(
       Padding(
         padding: EdgeInsets.symmetric(vertical: 10.h),
@@ -394,7 +385,7 @@ class UpgradeView extends GetView<SettingsController> {
           title: 'Upgrade to Premium',
           description: 'Unlock Premium Features',
           onPackageSelected: (package) async {
-            await PurchaseApi.purchasePackage(package);
+            await PurchaseApi.purchasePackage(context, package);
             Navigator.pop(Get.context!);
           },
         ),

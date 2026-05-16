@@ -31,7 +31,9 @@ class HomeView extends GetView<HomeController> {
         showPaymentDialog();
       }
     });
-
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.loadBanner();
+    });
     debugPrint('Popups value: ${controller.popups.value}');
     debugPrint('renewalDate value: ${revenueCatController.renewalDate}');
     return Obx(
@@ -224,14 +226,18 @@ class HomeView extends GetView<HomeController> {
                     CustomButton(
                       onPress: () async {
                         debugPrint(
-                          'Count: ${'login ${authController.isLoggedIn.value} sign ${authController.isSignedIn.value}'}',
+                          'Ad Click Count: ${controller.adClickCount.value}',
                         );
 
-                        if (!authController.isLoggedIn.value ||
-                            !authController.isSignedIn.value ||
-                            revenueCatController.renewalDate.isEmpty) {
-                          print('checking things ${!authController.isLoggedIn.value} '
-                              '${!authController.isSignedIn.value} ${revenueCatController.renewalDate.isEmpty}');
+                        bool isPremium =
+                            (authController.isLoggedIn.value ||
+                                authController.isSignedIn.value) &&
+                            revenueCatController.renewalDate.isNotEmpty;
+
+                        if (controller.adClickCount.value > 0 &&
+                            !isPremium &&
+                            controller.adClickCount.value <= 2) {
+                          debugPrint('Showing Interstitial Ad');
                           controller.showInterstitial();
                         }
                         controller.handleScan();

@@ -37,7 +37,7 @@ class SnackBarConfig {
           textColor: AppColor.backgroundColor,
           accentColor: AppColor.redColor,
           icon: Icons.error_outline,
-          duration: const Duration(seconds: 3),
+          duration: const Duration(seconds: 5),
         );
       case SnackBarType.warning:
         return SnackBarConfig(
@@ -58,8 +58,6 @@ class SnackBarConfig {
     }
   }
 }
-
-// ─── Queue ────────────────────────────────────────────────────────────────────
 
 class _SnackBarQueue {
   static final _SnackBarQueue _instance = _SnackBarQueue._internal();
@@ -97,10 +95,7 @@ class _SnackBarJob {
   });
 }
 
-// ─── Core overlay presenter (no GetX context lookup) ─────────────────────────
-
 void _showOverlayEntry(_SnackBarJob job, {required VoidCallback onDone}) {
-  // Use GetX's own navigator key — always valid, no Overlay.of() lookup needed
   final overlayState = Get.key.currentState?.overlay;
   if (overlayState == null) {
     onDone();
@@ -123,8 +118,6 @@ void _showOverlayEntry(_SnackBarJob job, {required VoidCallback onDone}) {
 
   overlayState.insert(entry);
 }
-
-// ─── Animated overlay widget ──────────────────────────────────────────────────
 
 class _SnackBarOverlay extends StatefulWidget {
   final _SnackBarJob job;
@@ -159,7 +152,6 @@ class _SnackBarOverlayState extends State<_SnackBarOverlay>
 
     _controller.forward();
 
-    // Auto dismiss
     Future.delayed(widget.job.config.duration, _dismiss);
   }
 
@@ -267,8 +259,6 @@ class _SnackBarOverlayState extends State<_SnackBarOverlay>
     );
   }
 }
-
-// ─── Public API ───────────────────────────────────────────────────────────────
 
 void customSnackBar({
   required String title,

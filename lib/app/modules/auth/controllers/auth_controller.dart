@@ -375,7 +375,7 @@ class AuthController extends GetxController {
         isSignedIn.value = true;
         await fcmRegister(await _notificationService.getDeviceToken());
         revenueCatController.init();
-        Get.offAllNamed(Routes.home);
+        Get.to(() => Navbar(), transition: Transition.fadeIn);
       } else {
         final errorMsg =
             response['data']['errors'] ??
@@ -560,8 +560,6 @@ class AuthController extends GetxController {
           isSuccess: true,
         );
         final origin = Get.arguments?['origin'] as String?;
-
-        await fcmRegister(await _notificationService.getDeviceToken());
         Get.to(
           () => ChangePasswordView(),
           transition: Transition.noTransition,
@@ -621,7 +619,6 @@ class AuthController extends GetxController {
           isSuccess: true,
         );
         final origin = Get.arguments?['origin'] as String?;
-        await fcmRegister(await _notificationService.getDeviceToken());
         Get.to(
           () => ChangePasswordView(),
           transition: Transition.noTransition,
@@ -1074,7 +1071,7 @@ class AuthController extends GetxController {
       final h = Get.find<HomeController>();
 
       h.historyItems.clear();
-      h.count.value = 0;
+      h.adClickCount.value = 0;
       h.qrCode.value = '';
       h.isScanning.value = false;
       h.selectedIndex.value = 0;
