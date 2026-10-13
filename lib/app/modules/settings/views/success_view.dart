@@ -51,9 +51,7 @@ class SuccessView extends GetView<SettingsController> {
             SizedBox(height: 25.h),
             CustomButton(
               onPress: () async {
-                {
-                  Get.to(Navbar());
-                }
+                Get.offAll(() => Navbar());
               },
               title: 'Continue',
             ),

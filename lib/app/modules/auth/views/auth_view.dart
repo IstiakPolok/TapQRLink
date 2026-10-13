@@ -7,7 +7,6 @@ import '../../../../res/assets/image_assets.dart';
 import '../../../../res/colors/app_color.dart';
 import '../../../../widgets/custom_button.dart';
 import '../../../../widgets/input_text_widget.dart';
-import '../../../../widgets/show_custom_snack_bar.dart';
 import '../../settings/controllers/settings_controller.dart';
 import '../controllers/auth_controller.dart';
 import 'forget_password_view.dart';
@@ -300,11 +299,20 @@ class AuthView extends GetView<AuthController> {
                     ),
                     SizedBox(height: 20.h),
                     GestureDetector(
-                      onTap: controller.signInWithGoogle,
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        if (!controller.isGoogleLoading.value &&
+                            !controller.isSocialLoading.value) {
+                          controller.signInWithGoogle();
+                        }
+                      },
                       child: Obx(
                         () => Container(
                           height: 40.h,
                           decoration: ShapeDecoration(
+                            color: settingsController.isDarkMode.value
+                                ? AppColor.darkThemeColor
+                                : AppColor.whiteColor,
                             shape: RoundedRectangleBorder(
                               side: BorderSide(
                                 width: 1.w,
@@ -313,7 +321,7 @@ class AuthView extends GetView<AuthController> {
                               borderRadius: BorderRadius.circular(8.r),
                             ),
                           ),
-                          child: controller.isSocialLoading.value
+                          child: controller.isGoogleLoading.value
                               ? SizedBox(
                                   width: 20.sp,
                                   height: 20.sp,
@@ -349,11 +357,20 @@ class AuthView extends GetView<AuthController> {
                     ),
                     SizedBox(height: 20.h),
                     GestureDetector(
-                      onTap: controller.signInWithGoogle,
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        if (!controller.isAppleLoading.value &&
+                            !controller.isSocialLoading.value) {
+                          controller.signInWithApple();
+                        }
+                      },
                       child: Obx(
                         () => Container(
                           height: 40.h,
                           decoration: ShapeDecoration(
+                            color: settingsController.isDarkMode.value
+                                ? AppColor.darkThemeColor
+                                : AppColor.whiteColor,
                             shape: RoundedRectangleBorder(
                               side: BorderSide(
                                 width: 1.w,
@@ -362,7 +379,7 @@ class AuthView extends GetView<AuthController> {
                               borderRadius: BorderRadius.circular(8.r),
                             ),
                           ),
-                          child: controller.isSocialLoading.value
+                          child: controller.isAppleLoading.value
                               ? SizedBox(
                                   width: 20.sp,
                                   height: 20.sp,

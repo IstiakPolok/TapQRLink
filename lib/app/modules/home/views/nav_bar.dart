@@ -32,7 +32,12 @@ class Navbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Obx(() => pages[controller.selectedIndex.value]),
+      body: Obx(
+        () => IndexedStack(
+          index: controller.selectedIndex.value,
+          children: pages,
+        ),
+      ),
       bottomNavigationBar: SafeArea(
         child: Obx(
           () => CurvedBottomNavBar(

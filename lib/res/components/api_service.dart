@@ -156,13 +156,27 @@ class ApiService extends GetxService {
     }
   }
 
-  Future<http.Response> signUpWithOther(String email, String fcmToken) async {
+  Future<http.Response> signUpWithOther(
+    String email,
+    String fcmToken, {
+    String? firstName,
+    String? lastName,
+  }) async {
     final url = Uri.parse(AppUrl.signUpWithOtherUrl);
     final headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
-    final body = {'email': email, 'fcm_token': fcmToken};
+    final Map<String, dynamic> body = {
+      'email': email,
+      'fcm_token': fcmToken,
+    };
+    if (firstName != null && firstName.trim().isNotEmpty) {
+      body['first_name'] = firstName.trim();
+    }
+    if (lastName != null && lastName.trim().isNotEmpty) {
+      body['last_name'] = lastName.trim();
+    }
     try {
       final response = await client.post(
         url,
@@ -442,7 +456,7 @@ class ApiService extends GetxService {
           'first_name': firstName,
           'last_name': lastName,
           'email': email,
-          'mobile': mobile,
+          if (mobile.isNotEmpty) 'mobile': mobile,
         }),
       );
       debugPrint('Request: POST $url');
@@ -795,6 +809,34 @@ class ApiService extends GetxService {
         'statusCode': 500,
         'data': {'error': e.toString()},
       };
+    }
+  }
+
+  Future<Map<String, dynamic>> updateProfileNames({
+    required String firstName,
+    required String lastName,
+    required String token,
+  }) async {
+    final url = Uri.parse(AppUrl.profileUrl);
+    try {
+      final multipartRequest = http.MultipartRequest('PUT', url);
+      multipartRequest.headers.addAll({
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+      multipartRequest.fields['first_name'] = firstName;
+      multipartRequest.fields['last_name'] = lastName;
+      final streamedResponse = await multipartRequest.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      debugPrint('updateProfileNames status: ${response.statusCode}');
+      debugPrint('updateProfileNames body: ${response.body}');
+      final responseData = response.body.isNotEmpty
+          ? jsonDecode(response.body)
+          : {};
+      return {'statusCode': response.statusCode, 'data': responseData};
+    } catch (e) {
+      debugPrint('updateProfileNames error: $e');
+      return {'statusCode': 500, 'data': {'error': e.toString()}};
     }
   }
 }

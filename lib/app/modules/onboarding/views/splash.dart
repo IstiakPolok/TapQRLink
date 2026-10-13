@@ -16,14 +16,24 @@ class SplashView extends GetView<AuthController> {
   @override
   Widget build(BuildContext context) {
     Get.find<OnboardingController>().getCheck();
+    debugPrint('SplashView: build called, starting 3-second delay...');
     Future.delayed(const Duration(seconds: 3), () {
       try {
-        controller.isLoggedIn.value ||
-                controller.isSignedIn.value ||
-                Get.find<OnboardingController>().isSkip
-            ? Get.off(() => Navbar())
-            : Get.off(() => OnboardingView());
-      } catch (e) {
+        final isLoggedInVal = controller.isLoggedIn.value;
+        final isSignedInVal = controller.isSignedIn.value;
+        final isSkipVal = Get.find<OnboardingController>().isSkip;
+        
+        debugPrint('SplashView: 3s delay completed. Flags - isLoggedIn: $isLoggedInVal, isSignedIn: $isSignedInVal, isSkip: $isSkipVal');
+        
+        if (isLoggedInVal || isSignedInVal || isSkipVal) {
+          debugPrint('SplashView: Navigating to Navbar...');
+          Get.off(() => Navbar());
+        } else {
+          debugPrint('SplashView: Navigating to OnboardingView...');
+          Get.off(() => OnboardingView());
+        }
+      } catch (e, stack) {
+        debugPrint('SplashView: Navigation error: $e\n$stack');
         showCustomSnackBar(
           title: 'Navigation Error',
           message: 'Failed to navigate to Home screen: $e',

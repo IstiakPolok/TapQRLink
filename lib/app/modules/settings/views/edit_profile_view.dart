@@ -199,7 +199,7 @@ class EditProfileView extends GetView<SettingsController> {
                           ),
                           SizedBox(height: 16.h),
                           Text(
-                            'Mobile Number:',
+                            'Mobile Number (Optional):',
                             style: TextStyle(
                               color: controller.isDarkMode.value == false
                                   ? AppColor.textColor
@@ -213,7 +213,7 @@ class EditProfileView extends GetView<SettingsController> {
                           InputTextWidget(
                             textEditingController:
                                 profileController.mobileController,
-                            hintText: 'Enter your phone number',
+                            hintText: 'Enter your phone number (optional)',
 
                             onChanged: (value) => (),
                             backgroundColor:

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:mobile_scanner/mobile_scanner.dart' as ms;
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -13,8 +12,10 @@ import '../../../routes/app_pages.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../settings/controllers/revenue_cat_controller.dart';
 import '../../settings/controllers/settings_controller.dart';
+import '../../settings/models/entitlement.dart';
 import '../../settings/views/subscription_view.dart';
 import '../controllers/home_controller.dart';
+import '../widget/banner_ad_widget.dart';
 import 'qr_code_view.dart';
 
 class HomeView extends GetView<HomeController> {
@@ -30,9 +31,6 @@ class HomeView extends GetView<HomeController> {
       if (!controller.popups.value) {
         showPaymentDialog();
       }
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      controller.loadBanner();
     });
     debugPrint('Popups value: ${controller.popups.value}');
     debugPrint('renewalDate value: ${revenueCatController.renewalDate}');
@@ -53,26 +51,18 @@ class HomeView extends GetView<HomeController> {
                     SizedBox(height: 20.h),
                     Obx(() {
                       bool showAd =
-                          revenueCatController.renewalDate.isEmpty &&
-                          controller.isBannerLoaded.value &&
-                          controller.bannerAd != null;
+                          (revenueCatController.renewalDate.isEmpty &&
+                              revenueCatController.entitlement != Entitlement.allFeatures);
 
                       if (showAd) {
-                        return Container(
-                          alignment: Alignment.center,
-                          width: controller.bannerAd!.size.width.toDouble(),
-                          height: controller.bannerAd!.size.height.toDouble(),
-                          child: AdWidget(
-                            key: Key(controller.bannerAd.hashCode.toString()),
-                            ad: controller.bannerAd!,
-                          ),
-                        );
+                        return BannerAdWidget(adUnitId: controller.bannerId);
                       }
                       return const SizedBox.shrink();
                     }),
                     SizedBox(height: 15.h),
                     Obx(() {
-                      if (revenueCatController.renewalDate.isEmpty) {
+                      if (revenueCatController.renewalDate.isEmpty &&
+                          revenueCatController.entitlement != Entitlement.allFeatures) {
                         return CustomButton(
                           onPress: () async {
                             authController.isSignedIn.value ||
@@ -100,37 +90,37 @@ class HomeView extends GetView<HomeController> {
                     SizedBox(height: 15.h),
                   ],
                 ),
-                Obx(
-                  () => controller.isScanning.value
-                      ? Expanded(
-                          child: Container(
-                            color: settingsController.isDarkMode.value
-                                ? AppColor.darkThemeColor
-                                : AppColor.whiteColor,
-                            child: MobileScanner(
-                              controller: controller.mobileScannerController,
-                              onDetect: (ms.BarcodeCapture capture) {
-                                for (final b in capture.barcodes) {
-                                  final code = b.rawValue;
-                                  if (code != null && code.isNotEmpty) {
-                                    controller.qrCode.value = code;
-                                    controller.stopScanning();
-                                    Get.snackbar('QR Code Scanned', code);
-                                    Get.to(() => const QrCodeView());
-                                    break;
+                SizedBox(
+                  height: .4.sh,
+                  width: .8.sw,
+                  child: Obx(
+                    () => controller.isScanning.value
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(16.r),
+                            child: Container(
+                              color: settingsController.isDarkMode.value
+                                  ? AppColor.darkThemeColor
+                                  : AppColor.whiteColor,
+                              child: MobileScanner(
+                                controller: controller.mobileScannerController,
+                                onDetect: (ms.BarcodeCapture capture) {
+                                  for (final b in capture.barcodes) {
+                                    final code = b.rawValue;
+                                    if (code != null && code.isNotEmpty) {
+                                      controller.qrCode.value = code;
+                                      controller.stopScanning();
+                                      Get.to(() => const QrCodeView());
+                                      break;
+                                    }
                                   }
-                                }
-                              },
+                                },
+                              ),
                             ),
-                          ),
-                        )
-                      : SizedBox(
-                          height: .4.sh,
-                          width: .8.sw,
-                          child: Obx(() {
+                          )
+                        : Obx(() {
                             return controller.selectedImage.value;
                           }),
-                        ),
+                  ),
                 ),
                 Column(
                   children: [
@@ -175,11 +165,11 @@ class HomeView extends GetView<HomeController> {
                     SizedBox(height: 15.h),
                     Obx(
                       () => GestureDetector(
+                        behavior: HitTestBehavior.opaque,
                         onTap: () async {
                           if (controller.isScanning.value ||
                               controller.isScanning1.value) {
                             controller.stopScanning();
-                            await controller.cancelScanning();
                           } else {
                             await controller.startScanning();
                           }
@@ -195,6 +185,8 @@ class HomeView extends GetView<HomeController> {
                             ),
                           ),
                           child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             spacing: 5.w,
                             children: [
                               Icon(
@@ -229,10 +221,11 @@ class HomeView extends GetView<HomeController> {
                           'Ad Click Count: ${controller.adClickCount.value}',
                         );
 
-                        bool isPremium =
+                         bool isPremium =
                             (authController.isLoggedIn.value ||
                                 authController.isSignedIn.value) &&
-                            revenueCatController.renewalDate.isNotEmpty;
+                            (revenueCatController.renewalDate.isNotEmpty ||
+                                revenueCatController.entitlement == Entitlement.allFeatures);
 
                         if (controller.adClickCount.value > 0 &&
                             !isPremium &&
@@ -306,7 +299,7 @@ void showPaymentDialog() async {
                 onPress: () async {
                   storage.write(key: 'popup', value: 'true');
                   Navigator.of(Get.context!).pop();
-                  showTapQRLinkDialog();
+                  showGuideDialog();
                 },
                 title: 'Cancel',
                 textColor: AppColor.defaultColor,
@@ -323,75 +316,9 @@ void showPaymentDialog() async {
                   storage.write(key: 'popup', value: 'true');
                   Navigator.of(Get.context!).pop();
                   controller.isPlane.toggle();
-                  showTapQRLinkDialog();
+                  showGuideDialog();
                 },
                 title: 'Continue',
-                height: 32,
-                width: 84,
-                fontSize: 12,
-                buttonColor: settingsController.isDarkMode.value
-                    ? AppColor.default40Color
-                    : AppColor.backgroundColor,
-                textColor: settingsController.isDarkMode.value
-                    ? AppColor.whiteColor
-                    : AppColor.defaultColor,
-              ),
-            ],
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-void showTapQRLinkDialog() async {
-  final SettingsController settingsController = Get.find();
-  Get.dialog(
-    AlertDialog(
-      backgroundColor: settingsController.isDarkMode.value
-          ? AppColor.darkThemeColor
-          : AppColor.containerColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-      contentPadding: EdgeInsets.all(12.sp),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'TapQRLink – Would Like to\nAccess Your Photo Library',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: settingsController.isDarkMode.value
-                  ? AppColor.whiteColor
-                  : AppColor.textColor,
-              fontSize: 16.sp,
-              fontFamily: 'Nunito Sans',
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          SizedBox(height: 16.h),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              CustomButton(
-                onPress: () async {
-                  Navigator.of(Get.context!).pop();
-                  showGuideDialog();
-                },
-                title: 'Cancel',
-                textColor: AppColor.defaultColor,
-                height: 32,
-                width: 84,
-                fontSize: 12,
-                buttonColor: settingsController.isDarkMode.value
-                    ? AppColor.darkThemeColor
-                    : AppColor.backgroundColor,
-              ),
-              CustomButton(
-                onPress: () async {
-                  Navigator.of(Get.context!).pop();
-                  showGuideDialog();
-                },
-                title: 'Allow',
                 height: 32,
                 width: 84,
                 fontSize: 12,

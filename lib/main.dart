@@ -40,9 +40,7 @@ Future main() async {
   await GetStorage.init();
   WidgetsFlutterBinding.ensureInitialized();
   await MobileAds.instance.initialize();
-  await Firebase.initializeApp();
-
-  Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   Get.put(OnboardingController());
   Get.put(ApiService());
@@ -60,7 +58,7 @@ Future main() async {
   Get.put(BottomSheetController());
   Get.put(NotificationController());
 
-  await Get.find<NotificationService>().initialize();
+  Get.find<NotificationService>().initialize();
   await settingsController.loadPreferences();
   debugPrint(
     'Main: Initial isDarkMode: ${settingsController.isDarkMode.value}',
@@ -76,11 +74,10 @@ Future main() async {
       minTextAdapt: true,
       splitScreenMode: true,
       builder: (context, child) {
-        final isDeviceDarkMode =
-            MediaQuery.of(context).platformBrightness == Brightness.dark;
-        settingsController.isDarkMode.value = isDeviceDarkMode;
-        return Obx(
-          () => GetMaterialApp(
+        debugPrint("main.dart: ScreenUtilInit builder called");
+        return Obx(() {
+          debugPrint("main.dart: Obx inside ScreenUtilInit builder called");
+          return GetMaterialApp(
             initialBinding: AuthBinding(),
             debugShowCheckedModeBanner: false,
             title: "QR Code App",
@@ -114,6 +111,9 @@ Future main() async {
                 ? ThemeMode.dark
                 : ThemeMode.light,
             builder: (context, child) {
+              debugPrint(
+                "main.dart: GetMaterialApp builder called. child is null: ${child == null}",
+              );
               return MediaQuery(
                 data: MediaQuery.of(
                   context,
@@ -121,8 +121,8 @@ Future main() async {
                 child: child!,
               );
             },
-          ),
-        );
+          );
+        });
       },
     ),
   );

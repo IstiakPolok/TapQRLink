@@ -7,8 +7,9 @@ import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../res/components/api_service.dart';
-import '../../../routes/app_pages.dart';
+import '../../../../widgets/show_custom_snack_bar.dart';
 import '../../auth/controllers/auth_controller.dart';
+import 'revenue_cat_controller.dart';
 
 class PreferencesService {
   static Future setDarkMode(bool value) async {
@@ -72,8 +73,7 @@ class SettingsController extends GetxController {
 
   Future<void> deleteAccount() async {
     isLoading.value = true;
-    await Future.delayed(Duration(seconds: 1));
-    Get.toNamed(Routes.auth);
+    await authController.deleteAccount();
     isLoading.value = false;
   }
 
@@ -95,7 +95,7 @@ class SettingsController extends GetxController {
         "goog_IzfnIIlGDwAuEaSXJVnqWKAzaoq",
       );
     } else {
-      configuration = PurchasesConfiguration("appl_your_public_api_key");
+      configuration = PurchasesConfiguration("appl_ODWbbfJqDQsHWuikvFYKtXifiin");
     }
 
     await Purchases.configure(configuration);
@@ -108,15 +108,14 @@ class SettingsController extends GetxController {
     try {
       offerings.value = await Purchases.getOfferings();
     } catch (e) {
-      Get.snackbar("Error", "Could not fetch offerings");
+      debugPrint("Error fetching offerings: $e");
     }
   }
 
   Future<void> refreshCustomerInfo() async {
     try {
       CustomerInfo customerInfo = await Purchases.getCustomerInfo();
-      isPremium.value =
-          customerInfo.entitlements.all["premium"]?.isActive ?? false;
+      isPremium.value = customerInfo.entitlements.active.isNotEmpty;
     } catch (e) {
       debugPrint("Error refreshing customer info: $e");
     }
@@ -124,14 +123,117 @@ class SettingsController extends GetxController {
 
   Future<void> purchasePackage(Package package) async {
     try {
+      // Show loading indicator
+      Get.dialog(
+        const Center(child: CircularProgressIndicator()),
+        barrierDismissible: false,
+      );
+
       PurchaseResult result = await Purchases.purchasePackage(package);
-      if (result.customerInfo.entitlements.all["premium"]?.isActive == true) {
+      
+      // Dismiss loading indicator
+      if (Get.isDialogOpen == true) {
+        Get.back();
+      }
+
+      final hasActiveEntitlement = result.customerInfo.entitlements.active.isNotEmpty;
+      if (hasActiveEntitlement) {
         isPremium.value = true;
-        Navigator.pop(Get.context!);
-        Get.snackbar("Success", "Welcome to Premium!");
+        
+        // Refresh RevenueCatController status
+        final revenueCatController = Get.find<RevenueCatController>();
+        await revenueCatController.updatePurchaseStatus(info: result.customerInfo);
+        
+        // Explicitly sync subscription date with backend after purchase
+        await revenueCatController.syncSubscriptionWithBackend(force: true);
+        
+        // Close UpgradeView to return to SubscriptionView / SettingsView
+        if (Navigator.canPop(Get.context!)) {
+          Get.back();
+        }
+
+        showCustomSnackBar(
+          title: "Success",
+          message: "Welcome to Premium! You have full access.",
+          isSuccess: true,
+        );
+      } else {
+        showCustomSnackBar(
+          title: "Error",
+          message: "Purchase completed, but premium entitlement is not active.",
+          isSuccess: false,
+        );
       }
     } catch (e) {
+      // Dismiss loading indicator if open
+      if (Get.isDialogOpen == true) {
+        Get.back();
+      }
       debugPrint('Error purchasing package: $e');
+      final errStr = e.toString();
+      if (!errStr.contains('PURCHASE_CANCELLED') && !errStr.contains('Purchase was cancelled')) {
+        showCustomSnackBar(
+          title: "Error",
+          message: "Failed to complete purchase: $e",
+          isSuccess: false,
+        );
+      }
+    }
+  }
+
+  Future<void> restorePurchases() async {
+    try {
+      // Show loading indicator
+      Get.dialog(
+        const Center(child: CircularProgressIndicator()),
+        barrierDismissible: false,
+      );
+
+      CustomerInfo customerInfo = await Purchases.restorePurchases();
+      
+      // Dismiss loading indicator
+      if (Get.isDialogOpen == true) {
+        Get.back();
+      }
+
+      final hasActiveEntitlement = customerInfo.entitlements.active.isNotEmpty;
+      if (hasActiveEntitlement) {
+        isPremium.value = true;
+        
+        // Refresh RevenueCatController status
+        final revenueCatController = Get.find<RevenueCatController>();
+        await revenueCatController.updatePurchaseStatus(info: customerInfo);
+        
+        // Explicitly sync subscription date with backend
+        await revenueCatController.syncSubscriptionWithBackend(force: true);
+        
+        if (Navigator.canPop(Get.context!)) {
+          Get.back();
+        }
+
+        showCustomSnackBar(
+          title: "Success",
+          message: "Subscription successfully restored!",
+          isSuccess: true,
+        );
+      } else {
+        showCustomSnackBar(
+          title: "Restore Purchases",
+          message: "No active premium subscription found to restore.",
+          isSuccess: false,
+        );
+      }
+    } catch (e) {
+      // Dismiss loading indicator if open
+      if (Get.isDialogOpen == true) {
+        Get.back();
+      }
+      debugPrint('Error restoring purchases: $e');
+      showCustomSnackBar(
+        title: "Error",
+        message: "Failed to restore purchases: $e",
+        isSuccess: false,
+      );
     }
   }
 }

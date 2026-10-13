@@ -77,6 +77,62 @@ class ProfileController extends GetxController {
     showCustomSnackBar(title: title, message: message, isSuccess: isSuccess);
   }
 
+  Future<void> _applyProfileData(ProfileModel? prof, String token) async {
+    String fname = prof?.firstName ?? '';
+    String lname = prof?.lastName ?? '';
+
+    // If API returned empty names, fallback to secure storage
+    if (fname.isEmpty) {
+      fname = await storage.read(key: 'first_name') ?? '';
+    }
+    if (lname.isEmpty) {
+      lname = await storage.read(key: 'last_name') ?? '';
+    }
+
+    final userEmail = (prof?.email != null && prof!.email.isNotEmpty)
+        ? prof.email
+        : (await storage.read(key: 'email') ?? email.value);
+
+    // If still empty, derive clean name from email address
+    if (fname.isEmpty && userEmail.isNotEmpty) {
+      final raw = userEmail.split('@').first;
+      fname = raw
+          .replaceAll(RegExp(r'[\._\-]'), ' ')
+          .split(' ')
+          .where((s) => s.isNotEmpty)
+          .map((s) => s[0].toUpperCase() + s.substring(1))
+          .join(' ');
+      if (fname.isEmpty) fname = 'User';
+      await storage.write(key: 'first_name', value: fname);
+    }
+
+    firstname.value = fname;
+    lastName.value = lname;
+    email.value = userEmail;
+    bio.value = prof?.bio ?? '';
+    mobile.value = prof?.mobileNumber ?? '';
+    profilePicture.value = prof?.profilePicture ?? '';
+
+    firstnameController.text = fname;
+    lastNameController.text = lname;
+    emailController.text = userEmail;
+    bioController.text = bio.value;
+    mobileController.text = mobile.value;
+
+    // If backend had empty first_name, push our name to backend in background
+    if ((prof?.firstName == null || prof!.firstName.isEmpty) && fname.isNotEmpty && token.isNotEmpty) {
+      try {
+        apiService.updateProfileNames(
+          firstName: fname,
+          lastName: lname,
+          token: token,
+        );
+      } catch (e) {
+        debugPrint('Background name sync to backend: $e');
+      }
+    }
+  }
+
   Future<void> fetchProfile() async {
     try {
       isLoading.value = true;
@@ -89,19 +145,8 @@ class ProfileController extends GetxController {
       final response = await apiService.getProfile(token);
       if (response['statusCode'] == 200) {
         profile.value = ProfileModel.fromJson(response['data']);
-        debugPrint('firstName: ${profile.value?.firstName}');
-        firstname.value = profile.value?.firstName ?? '';
-        lastName.value = profile.value?.lastName ?? '';
-        email.value = profile.value?.email ?? '';
-        bio.value = profile.value?.bio ?? '';
-        mobile.value = profile.value?.mobileNumber ?? '';
-        profilePicture.value = profile.value?.profilePicture ?? '';
-
-        firstnameController.text = firstname.value;
-        lastNameController.text = lastName.value;
-        emailController.text = email.value;
-        bioController.text = bio.value;
-        mobileController.text = mobile.value;
+        debugPrint('firstName from API: ${profile.value?.firstName}');
+        await _applyProfileData(profile.value, token);
       } else if (response['statusCode'] == 401) {
         final refreshToken = await storage.read(key: 'refresh');
         final refreshed = await authController.refreshAccessToken(
@@ -116,18 +161,7 @@ class ProfileController extends GetxController {
               debugPrint(
                 'firstName after token refresh: ${profile.value?.firstName}',
               );
-              firstname.value = profile.value?.firstName ?? '';
-              lastName.value = profile.value?.lastName ?? '';
-              email.value = profile.value?.email ?? '';
-              bio.value = profile.value?.bio ?? '';
-              mobile.value = profile.value?.mobileNumber ?? '';
-              profilePicture.value = profile.value?.profilePicture ?? '';
-
-              firstnameController.text = firstname.value;
-              lastNameController.text = lastName.value;
-              emailController.text = email.value;
-              bioController.text = bio.value;
-              mobileController.text = mobile.value;
+              await _applyProfileData(profile.value, newToken);
             } else {
               final errorMsg =
                   retryResponse['data']['error'] ??

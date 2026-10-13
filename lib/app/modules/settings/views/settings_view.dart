@@ -141,9 +141,27 @@ class SettingsView extends GetView<SettingsController> {
                             }
 
                             final profile = profileController.profile.value;
+                            String displayName = '${profile?.firstName ?? ''} ${profile?.lastName ?? ''}'.trim();
+                            if (displayName.isEmpty) {
+                              displayName = '${profileController.firstname.value} ${profileController.lastName.value}'.trim();
+                            }
+                            if (displayName.isEmpty) {
+                              displayName = profileController.firstname.value.trim();
+                            }
+                            if (displayName.isEmpty && profile?.email != null && profile!.email.isNotEmpty) {
+                              final raw = profile.email.split('@').first;
+                              displayName = raw
+                                  .replaceAll(RegExp(r'[\._\-]'), ' ')
+                                  .split(' ')
+                                  .where((s) => s.isNotEmpty)
+                                  .map((s) => s[0].toUpperCase() + s.substring(1))
+                                  .join(' ');
+                            }
+                            if (displayName.isEmpty) {
+                              displayName = 'User';
+                            }
                             return Text(
-                              '${profile?.firstName ?? ''} ${profile?.lastName ?? ''}'
-                                  .trim(),
+                              displayName,
                               style: TextStyle(
                                 color: controller.isDarkMode.value
                                     ? AppColor.whiteColor
@@ -183,7 +201,7 @@ class SettingsView extends GetView<SettingsController> {
                     ),
                   ],
                 ),
-                authController.isSignedIn.value == true ||
+                 authController.isSignedIn.value == true ||
                         authController.isLoggedIn.value == true
                     ? Column(
                         children: [
@@ -193,7 +211,22 @@ class SettingsView extends GetView<SettingsController> {
                             },
                             title: 'Log Out',
                           ),
-                          SizedBox(height: 40.h),
+                          SizedBox(height: 12.h),
+                          TextButton(
+                            onPressed: () {
+                              showDeleteAccountDialog();
+                            },
+                            child: Text(
+                              'Delete Account',
+                              style: TextStyle(
+                                color: AppColor.redLightColor,
+                                fontSize: 14.sp,
+                                fontFamily: 'Nunito Sans',
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: 20.h),
                         ],
                       )
                     : Column(
@@ -335,6 +368,79 @@ class SettingsView extends GetView<SettingsController> {
                   textColor: controller.isDarkMode.value
                       ? AppColor.whiteColor
                       : AppColor.defaultColor,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void showDeleteAccountDialog() {
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: controller.isDarkMode.value
+            ? AppColor.darkThemeColor
+            : AppColor.containerColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.r),
+        ),
+        contentPadding: EdgeInsets.all(12.sp),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Delete Account?',
+              style: TextStyle(
+                color: AppColor.redLightColor,
+                fontSize: 18.sp,
+                fontFamily: 'Nunito Sans',
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              'This action is permanent and will delete all your data and subscription information.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: controller.isDarkMode.value
+                    ? AppColor.whiteColor
+                    : AppColor.textColor,
+                fontSize: 14.sp,
+                fontFamily: 'Nunito Sans',
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            SizedBox(height: 16.h),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                CustomButton(
+                  onPress: () async {
+                    Navigator.pop(Get.context!);
+                  },
+                  title: 'Cancel',
+                  textColor: AppColor.defaultColor,
+                  height: 32,
+                  width: 84,
+                  fontSize: 12,
+                  borderColor: AppColor.defaultColor,
+                  buttonColor: controller.isDarkMode.value
+                      ? AppColor.darkThemeColor
+                      : AppColor.backgroundColor,
+                ),
+                CustomButton(
+                  onPress: () async {
+                    Navigator.pop(Get.context!);
+                    await controller.deleteAccount();
+                  },
+                  title: 'Delete',
+                  height: 32,
+                  width: 84,
+                  fontSize: 12,
+                  buttonColor: AppColor.redLightColor,
+                  textColor: AppColor.whiteColor,
                 ),
               ],
             ),

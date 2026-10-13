@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:qr_code/app/modules/home/controllers/home_controller.dart';
 import 'package:qr_code/app/modules/settings/controllers/revenue_cat_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -36,6 +38,8 @@ class AuthController extends GetxController {
   final RxBool isStorageAvailable = true.obs;
   final RxBool isLoading = false.obs;
   final RxBool isSocialLoading = false.obs;
+  final RxBool isGoogleLoading = false.obs;
+  final RxBool isAppleLoading = false.obs;
   final RxString errorMessage = ''.obs;
   final RxBool isCheckingToken = true.obs;
   final RxBool isLoggedIn = false.obs;
@@ -195,11 +199,21 @@ class AuthController extends GetxController {
 
   Future<void> signInWithGoogle() async {
     try {
-      String fcmToken = await _notificationService.getDeviceToken();
-      debugPrint('FCM Token: $fcmToken');
-      isLoading.value = true;
+      isGoogleLoading.value = true;
+      isSocialLoading.value = true;
+      String fcmToken = '';
+      try {
+        fcmToken = await _notificationService.getDeviceToken();
+        debugPrint('FCM Token: $fcmToken');
+      } catch (e) {
+        debugPrint('Error getting device token: $e');
+      }
+      
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      if (googleUser == null) return;
+      if (googleUser == null) {
+        debugPrint('Google sign in was cancelled by user');
+        return;
+      }
 
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
@@ -213,7 +227,7 @@ class AuthController extends GetxController {
       );
       final User? user = userCredential.user;
 
-      if (user != null) {
+      if (user != null && user.email != null) {
         debugPrint(
           ':::::::::::USER EMAIL::::::::::::::::::::::::::::${user.email}',
         );
@@ -222,12 +236,218 @@ class AuthController extends GetxController {
         );
         debugPrint(':::::::::::USER ID::::::::::::::::::::::::::::${user.uid}');
 
-        await signUpWithOther(user.email!, fcmToken);
+        String? googleFirstName;
+        String? googleLastName;
+        if (user.displayName != null && user.displayName!.trim().isNotEmpty) {
+          final parts = user.displayName!.trim().split(' ');
+          googleFirstName = parts.first;
+          if (parts.length > 1) {
+            googleLastName = parts.sublist(1).join(' ');
+          }
+        }
+
+        await signUpWithOther(
+          user.email!,
+          fcmToken,
+          firstName: googleFirstName,
+          lastName: googleLastName,
+        );
+      } else {
+        showCustomSnackBar(
+          title: 'Error',
+          message: 'Failed to retrieve email from Google account',
+          backgroundColor: AppColor.redColor,
+          isSuccess: false,
+        );
       }
     } catch (e) {
-      debugPrint("Error signing in: $e");
+      debugPrint("Error signing in with Google: $e");
+      showCustomSnackBar(
+        title: 'Google Sign In Failed',
+        message: 'Could not complete Google Sign-In. Please try again.',
+        backgroundColor: AppColor.redColor,
+        isSuccess: false,
+      );
     } finally {
-      isLoading.value = false;
+      isGoogleLoading.value = false;
+      isSocialLoading.value = false;
+    }
+  }
+
+  Future<void> signInWithApple() async {
+    if (isAppleLoading.value || isSocialLoading.value) return;
+    try {
+      isAppleLoading.value = true;
+      isSocialLoading.value = true;
+
+      final isAvailable = await SignInWithApple.isAvailable();
+      if (!isAvailable) {
+        showCustomSnackBar(
+          title: 'Sign In Unavailable',
+          message: 'Apple Sign-In is not supported or available on this device.',
+          backgroundColor: AppColor.redColor,
+          isSuccess: false,
+        );
+        return;
+      }
+
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      String? email = credential.email;
+      final String userIdentifier = credential.userIdentifier ?? '';
+
+      // 1. Extract Apple name (Only provided on the 1st authorization!)
+      String? firstName = credential.givenName;
+      String? lastName = credential.familyName;
+
+      // 2. Cache Name & Email if returned (Apple only sends them on the first authorization)
+      if (userIdentifier.isNotEmpty) {
+        if (firstName != null && firstName.isNotEmpty) {
+          await _writeToStorage('apple_first_name_$userIdentifier', firstName);
+        } else {
+          // Restore cached first name for repeat logins
+          firstName = await _readFromStorage('apple_first_name_$userIdentifier');
+        }
+
+        if (lastName != null && lastName.isNotEmpty) {
+          await _writeToStorage('apple_last_name_$userIdentifier', lastName);
+        } else {
+          // Restore cached last name for repeat logins
+          lastName = await _readFromStorage('apple_last_name_$userIdentifier');
+        }
+
+        if (email != null && email.isNotEmpty) {
+          await _writeToStorage('apple_email_$userIdentifier', email);
+        } else {
+          // Restore cached email for repeat logins
+          email = await _readFromStorage('apple_email_$userIdentifier');
+        }
+      }
+
+      // 3. Fallback: Parse identity token JWT for email claim
+      if ((email == null || email.isEmpty) && credential.identityToken != null) {
+        try {
+          final parts = credential.identityToken!.split('.');
+          if (parts.length >= 2) {
+            final normalized = base64Url.normalize(parts[1]);
+            final payloadString = utf8.decode(base64Url.decode(normalized));
+            final Map<String, dynamic> payload = jsonDecode(payloadString);
+            if (payload['email'] != null &&
+                payload['email'].toString().isNotEmpty) {
+              email = payload['email'].toString();
+              if (userIdentifier.isNotEmpty) {
+                await _writeToStorage('apple_email_$userIdentifier', email);
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Error decoding Apple identity token payload: $e');
+        }
+      }
+
+      // 4. Fallback: Use stable private relay email constructed from Apple userIdentifier
+      if (email == null || email.isEmpty) {
+        if (userIdentifier.isNotEmpty) {
+          email = '$userIdentifier@privaterelay.appleid.com';
+        } else {
+          email =
+              'apple_user_${DateTime.now().millisecondsSinceEpoch}@privaterelay.appleid.com';
+        }
+      }
+
+      // 5. Fallback for Name: If Apple didn't return names and cache is empty, derive from email
+      if ((firstName == null || firstName.trim().isEmpty) && email.isNotEmpty) {
+        final emailPrefix = email.split('@').first;
+        final formatted = emailPrefix
+            .replaceAll(RegExp(r'[\._\-]'), ' ')
+            .split(' ')
+            .where((s) => s.isNotEmpty)
+            .map((s) => s[0].toUpperCase() + s.substring(1))
+            .join(' ');
+        firstName = formatted.isNotEmpty ? formatted : 'Apple User';
+        if (userIdentifier.isNotEmpty) {
+          await _writeToStorage('apple_first_name_$userIdentifier', firstName);
+        }
+      }
+
+      final String fullName = [firstName, lastName]
+          .where((part) => part != null && part.trim().isNotEmpty)
+          .join(' ')
+          .trim();
+
+      if (firstName != null && firstName.isNotEmpty) {
+        await _writeToStorage('first_name', firstName);
+      }
+      if (lastName != null && lastName.isNotEmpty) {
+        await _writeToStorage('last_name', lastName);
+      }
+
+      debugPrint(
+        'Apple Sign-In: firstName="$firstName", lastName="$lastName", fullName="$fullName", email="$email", userIdentifier="$userIdentifier"',
+      );
+
+      // Optional: Firebase sign-in with Apple credential (non-blocking if provider unconfigured)
+      if (credential.identityToken != null) {
+        try {
+          final OAuthProvider oAuthProvider = OAuthProvider('apple.com');
+          final AuthCredential authCredential = oAuthProvider.credential(
+            idToken: credential.identityToken,
+            rawNonce: null,
+          );
+          final userCredential = await _auth.signInWithCredential(authCredential);
+          if (fullName.isNotEmpty) {
+            await userCredential.user?.updateDisplayName(fullName);
+          }
+          debugPrint('Successfully authenticated with Firebase via Apple (name: $fullName)');
+        } catch (e) {
+          debugPrint('Firebase Apple sign-in optional step: $e');
+        }
+      }
+
+      // Get FCM device token
+      String fcmToken = '';
+      try {
+        fcmToken = await _notificationService.getDeviceToken();
+        debugPrint('FCM Token for Apple user: $fcmToken');
+      } catch (e) {
+        debugPrint('Error getting FCM token: $e');
+      }
+
+      // Authenticate with backend API
+      await signUpWithOther(
+        email,
+        fcmToken,
+        firstName: firstName,
+        lastName: lastName,
+      );
+    } on SignInWithAppleAuthorizationException catch (e) {
+      debugPrint('Apple Sign-In authorization error: ${e.code} - ${e.message}');
+      if (e.code != AuthorizationErrorCode.canceled) {
+        showCustomSnackBar(
+          title: 'Sign In Failed',
+          message: e.message.isNotEmpty
+              ? e.message
+              : 'Sign in with Apple failed. Please check your Apple ID settings and try again.',
+          backgroundColor: AppColor.redColor,
+          isSuccess: false,
+        );
+      }
+    } catch (e) {
+      debugPrint('Apple sign in error: $e');
+      showCustomSnackBar(
+        title: 'Sign In Failed',
+        message: 'Could not complete Apple Sign-In. Please try again.',
+        backgroundColor: AppColor.redColor,
+        isSuccess: false,
+      );
+    } finally {
+      isAppleLoading.value = false;
+      isSocialLoading.value = false;
     }
   }
 
@@ -239,16 +459,30 @@ class AuthController extends GetxController {
   final NotificationService _notificationService = NotificationService();
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn googleSignIn = GoogleSignIn();
+  final GoogleSignIn googleSignIn = GoogleSignIn(
+    clientId: Platform.isIOS
+        ? '1042882535852-f186qqj66a3ul650cakldll1aj1n29rv.apps.googleusercontent.com'
+        : null,
+  );
 
   User? get currentUser => _auth.currentUser;
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
-  Future<void> signUpWithOther(String email, String fcmToken) async {
+  Future<void> signUpWithOther(
+    String email,
+    String fcmToken, {
+    String? firstName,
+    String? lastName,
+  }) async {
     isLoading.value = true;
     try {
-      final response = await apiService.signUpWithOther(email, fcmToken);
+      final response = await apiService.signUpWithOther(
+        email,
+        fcmToken,
+        firstName: firstName,
+        lastName: lastName,
+      );
 
       debugPrint(
         ':::::::::::::::RESPONSE:::::::::::::::::::::${response.body.toString()}',
@@ -273,11 +507,30 @@ class AuthController extends GetxController {
         await _writeToStorage('refresh', refreshToken ?? '');
         this.accessToken.value = accessToken;
         this.refreshToken.value = refreshToken ?? '';
+
+        if (firstName != null && firstName.trim().isNotEmpty) {
+          await _writeToStorage('first_name', firstName.trim());
+        }
+        if (lastName != null && lastName.trim().isNotEmpty) {
+          await _writeToStorage('last_name', lastName.trim());
+        }
+        if (Get.isRegistered<ProfileController>()) {
+          final profileController = Get.find<ProfileController>();
+          if (firstName != null && firstName.trim().isNotEmpty) {
+            profileController.firstname.value = firstName.trim();
+            profileController.firstnameController.text = firstName.trim();
+          }
+          if (lastName != null && lastName.trim().isNotEmpty) {
+            profileController.lastName.value = lastName.trim();
+            profileController.lastNameController.text = lastName.trim();
+          }
+        }
+
         showCustomSnackBar(title: 'Success', message: message, isSuccess: true);
         isSignedIn.value = true;
         await fcmRegister(fcmToken);
         revenueCatController.init();
-        Get.to(() => Navbar(), transition: Transition.fadeIn);
+        Get.offAll(() => Navbar(), transition: Transition.fadeIn);
 
         debugPrint(
           ':::::::::::::::responseBody:::::::::::::::::::::$responseBody',
@@ -315,6 +568,10 @@ class AuthController extends GetxController {
   }
 
   Future<void> fcmRegister(String fcmToken) async {
+    if (fcmToken.isEmpty) {
+      debugPrint('FCM Token is empty, skipping registration.');
+      return;
+    }
     isLoading.value = true;
     try {
       final token = await storage.read(key: 'access');
@@ -375,7 +632,7 @@ class AuthController extends GetxController {
         isSignedIn.value = true;
         await fcmRegister(await _notificationService.getDeviceToken());
         revenueCatController.init();
-        Get.to(() => Navbar(), transition: Transition.fadeIn);
+        Get.offAll(() => Navbar(), transition: Transition.fadeIn);
       } else {
         final errorMsg =
             response['data']['errors'] ??
@@ -431,15 +688,6 @@ class AuthController extends GetxController {
       showCustomSnackBar(
         title: 'Warning',
         message: 'Email is required',
-        backgroundColor: AppColor.orangeColor,
-        isSuccess: false,
-      );
-      return;
-    }
-    if (mobile.isEmpty) {
-      showCustomSnackBar(
-        title: 'Warning',
-        message: 'Mobile Number is required',
         backgroundColor: AppColor.orangeColor,
         isSuccess: false,
       );
@@ -761,7 +1009,7 @@ class AuthController extends GetxController {
           Get.offAllNamed(Routes.onboarding, arguments: {'origin': 'Signup'});
         } else if (origin == 'Forget' && verify == 'yes') {
           revenueCatController.init();
-          Get.to(() => Navbar(), transition: Transition.noTransition);
+          Get.offAll(() => Navbar(), transition: Transition.noTransition);
         }
       } else if (response['statusCode'] == 401) {
         final refresh = refreshToken.value;
@@ -807,7 +1055,7 @@ class AuthController extends GetxController {
                 );
               } else if (origin == 'Forget' && verify == 'yes') {
                 revenueCatController.init();
-                Get.to(() => Navbar(), transition: Transition.noTransition);
+                Get.offAll(() => Navbar(), transition: Transition.noTransition);
               }
             } else {
               final errorMsg =
@@ -1029,6 +1277,85 @@ class AuthController extends GetxController {
       showCustomSnackBar(
         title: 'Error',
         message: 'Failed to logout',
+        isSuccess: false,
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> deleteAccount() async {
+    debugPrint('Deleting account and clearing all data');
+    try {
+      isLoading.value = true;
+      
+      // Delete Firebase Auth user if present
+      try {
+        User? user = _auth.currentUser;
+        if (user != null) {
+          await user.delete();
+          debugPrint('Firebase user deleted successfully');
+        }
+      } on FirebaseAuthException catch (e) {
+        debugPrint('Firebase delete user error code: ${e.code}');
+        if (e.code == 'requires-recent-login') {
+          showCustomSnackBar(
+            title: 'Action Required',
+            message: 'Please re-authenticate / log in again to delete your account.',
+            isSuccess: false,
+          );
+          await logout();
+          return;
+        }
+      } catch (e) {
+        debugPrint('Firebase user delete error: $e');
+      }
+
+      // Perform local logout / cleanup steps
+      if (Get.isRegistered<RevenueCatController>()) {
+        await Get.find<RevenueCatController>().clearData();
+      }
+      await storage.deleteAll();
+
+      storage.write(key: 'popup', value: 'true');
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+
+      if (Get.isRegistered<HomeController>()) {
+        await Get.find<HomeController>().storageHistory.erase();
+      }
+
+      try {
+        if (await Purchases.isConfigured) {
+          await Purchases.logOut();
+        }
+      } catch (e) {
+        debugPrint('RevenueCat logout error: $e');
+      }
+
+      try {
+        await googleSignIn.signOut();
+      } catch (e) {
+        debugPrint('Google Sign-in signout error: $e');
+      }
+
+      _resetAuthStates();
+      _resetHomeStates();
+      _resetProfileStates();
+      _resetOtherStates();
+
+      Get.offAllNamed(Routes.home);
+
+      showCustomSnackBar(
+        title: 'Success',
+        message: 'Account deleted successfully',
+        isSuccess: true,
+      );
+    } catch (e) {
+      debugPrint('Error deleting account: $e');
+      showCustomSnackBar(
+        title: 'Error',
+        message: 'Failed to delete account. Please try again.',
         isSuccess: false,
       );
     } finally {

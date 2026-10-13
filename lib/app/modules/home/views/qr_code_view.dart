@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../res/assets/image_assets.dart';
 import '../../../../res/colors/app_color.dart';
+import '../../../../widgets/show_custom_snack_bar.dart';
 import '../controllers/home_controller.dart';
 
 class QrCodeView extends GetView<HomeController> {
@@ -195,7 +196,11 @@ class QrCodeView extends GetView<HomeController> {
                                 controller.qrCode.value,
                               );
                             } else {
-                              Get.snackbar('Error', 'No QR code data to copy');
+                              showCustomSnackBar(
+                                title: 'Error',
+                                message: 'No QR code data to copy',
+                                isSuccess: false,
+                              );
                             }
                           },
                           child: Container(

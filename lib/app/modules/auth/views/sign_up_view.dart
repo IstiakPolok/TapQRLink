@@ -8,7 +8,6 @@ import '../../../../res/assets/image_assets.dart';
 import '../../../../res/colors/app_color.dart';
 import '../../../../widgets/custom_button.dart';
 import '../../../../widgets/input_text_widget.dart';
-import '../../../../widgets/show_custom_snack_bar.dart';
 import '../../home/views/nav_bar.dart';
 import '../../settings/controllers/settings_controller.dart';
 import '../controllers/auth_controller.dart';
@@ -176,54 +175,13 @@ class SignUpView extends GetView<AuthController> {
                           ? AppColor.textColor
                           : AppColor.whiteColor,
                     ),
-                    SizedBox(height: 12.h),
-                    Text(
-                      'Mobile Number:',
-                      style: TextStyle(
-                        color: settingsController.isDarkMode.value == false
-                            ? AppColor.textColor
-                            : AppColor.whiteColor,
-                        fontSize: 14.sp,
-                        fontFamily: 'Nunito Sans',
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(height: 4.h),
-                    InputTextWidget(
-                      keyboardType: TextInputType.phone,
-                      hintText: 'Enter your mobile number',
-                      textEditingController: controller.mobileController,
-                      onChanged: (value) => (),
-                      backgroundColor:
-                          settingsController.isDarkMode.value == false
-                          ? AppColor.backgroundColor
-                          : AppColor.darkThemeColor,
-                      borderColor: settingsController.isDarkMode.value == false
-                          ? AppColor.borderColor
-                          : AppColor.darkThemeBorderColor,
-                      textColor: settingsController.isDarkMode.value == false
-                          ? AppColor.textColor
-                          : AppColor.whiteColor,
-                    ),
                     SizedBox(height: 37.h),
                     Obx(
                       () => CustomButton(
                         onPress: controller.isLoading.value
                             ? null
                             : () async {
-                                final mobile = controller.mobileController.text
-                                    .trim();
-                                if (!GetUtils.isPhoneNumber(mobile)) {
-                                  showCustomSnackBar(
-                                    title: 'Warning',
-                                    message:
-                                        'Please enter a valid mobile number',
-                                    backgroundColor: AppColor.orangeColor,
-                                    isSuccess: false,
-                                  );
-                                } else {
-                                  await controller.signup();
-                                }
+                                await controller.signup();
                               },
                         loading: controller.isLoading.value,
                         title: 'Next',
@@ -306,71 +264,126 @@ class SignUpView extends GetView<AuthController> {
                       ],
                     ),
                     SizedBox(height: 20.h),
-                    Container(
-                      height: 40.h,
-                      decoration: ShapeDecoration(
-                        shape: RoundedRectangleBorder(
-                          side: BorderSide(
-                            width: 1.w,
-                            color: AppColor.defaultColor,
-                          ),
-                          borderRadius: BorderRadius.circular(8.r),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        spacing: 10.w,
-                        children: [
-                          SvgPicture.asset(
-                            ImageAssets.ggl,
-                            width: 16.w,
-                            height: 16.h,
-                          ),
-                          Text(
-                            'Log In With Google',
-                            style: TextStyle(
-                              color: AppColor.defaultColor,
-                              fontSize: 14.sp,
-                              fontFamily: 'Nunito Sans',
-                              fontWeight: FontWeight.w600,
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        if (!controller.isGoogleLoading.value &&
+                            !controller.isSocialLoading.value) {
+                          controller.signInWithGoogle();
+                        }
+                      },
+                      child: Obx(
+                        () => Container(
+                          height: 40.h,
+                          decoration: ShapeDecoration(
+                            color: settingsController.isDarkMode.value
+                                ? AppColor.darkThemeColor
+                                : AppColor.whiteColor,
+                            shape: RoundedRectangleBorder(
+                              side: BorderSide(
+                                width: 1.w,
+                                color: AppColor.defaultColor,
+                              ),
+                              borderRadius: BorderRadius.circular(8.r),
                             ),
                           ),
-                        ],
+                          child: controller.isGoogleLoading.value
+                              ? SizedBox(
+                                  width: 20.sp,
+                                  height: 20.sp,
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      color: AppColor.defaultColor,
+                                    ),
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  spacing: 10.w,
+                                  children: [
+                                    SvgPicture.asset(
+                                      ImageAssets.ggl,
+                                      width: 16.w,
+                                      height: 16.h,
+                                    ),
+                                    Text(
+                                      'Log In With Google',
+                                      style: TextStyle(
+                                        color: AppColor.defaultColor,
+                                        fontSize: 14.sp,
+                                        fontFamily: 'Nunito Sans',
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
                       ),
                     ),
                     SizedBox(height: 20.h),
-                    Container(
-                      height: 40.h,
-                      decoration: ShapeDecoration(
-                        shape: RoundedRectangleBorder(
-                          side: BorderSide(
-                            width: 1.w,
-                            color: AppColor.defaultColor,
-                          ),
-                          borderRadius: BorderRadius.circular(8.r),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        spacing: 10.w,
-                        children: [
-                          SvgPicture.asset(
-                            ImageAssets.apple,
-                            width: 16.w,
-                            height: 16.h,
-                          ),
-                          Text(
-                            'Log In With Apple ID',
-                            style: TextStyle(
-                              color: AppColor.defaultColor,
-                              fontSize: 14.sp,
-                              fontFamily: 'Nunito Sans',
-                              fontWeight: FontWeight.w600,
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        if (!controller.isAppleLoading.value &&
+                            !controller.isSocialLoading.value) {
+                          controller.signInWithApple();
+                        }
+                      },
+                      child: Obx(
+                        () => Container(
+                          height: 40.h,
+                          decoration: ShapeDecoration(
+                            color: settingsController.isDarkMode.value
+                                ? AppColor.darkThemeColor
+                                : AppColor.whiteColor,
+                            shape: RoundedRectangleBorder(
+                              side: BorderSide(
+                                width: 1.w,
+                                color: AppColor.defaultColor,
+                              ),
+                              borderRadius: BorderRadius.circular(8.r),
                             ),
                           ),
-                        ],
+                          child: controller.isAppleLoading.value
+                              ? SizedBox(
+                                  width: 20.sp,
+                                  height: 20.sp,
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      color: AppColor.defaultColor,
+                                    ),
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  spacing: 10.w,
+                                  children: [
+                                    SvgPicture.asset(
+                                      ImageAssets.apple,
+                                      width: 24.w,
+                                      height: 24.h,
+                                      colorFilter: ColorFilter.mode(
+                                        settingsController.isDarkMode.value ==
+                                                false
+                                            ? AppColor.blackColor
+                                            : AppColor.whiteColor,
+                                        BlendMode.srcIn,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Log In With Apple ID',
+                                      style: TextStyle(
+                                        color: AppColor.defaultColor,
+                                        fontSize: 14.sp,
+                                        fontFamily: 'Nunito Sans',
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
                       ),
                     ),
                     SizedBox(height: 20.h),

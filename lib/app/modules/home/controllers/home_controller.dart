@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -64,15 +65,36 @@ class HomeController extends GetxController {
 
   BannerAd? bannerAd;
   InterstitialAd? interstitialAd;
+  RewardedAd? rewardedAd;
   var isBannerLoaded = false.obs;
+  var isRewardedLoaded = false.obs;
 
-  final String bannerId = Platform.isAndroid
-      ? 'ca-app-pub-3940256099942544/6300978111'
-      : 'ca-app-pub-3940256099942544/2934735716';
+  // Real AdMob iOS Ad Unit IDs (Production)
+  static const String _iosBannerId = 'ca-app-pub-8492413081634752/2175980736';
+  static const String _iosInterstitialId = 'ca-app-pub-8492413081634752/6577318220';
+  static const String iosRewardedId = 'ca-app-pub-8492413081634752/6633158542';
 
-  final String interstitialId = Platform.isAndroid
-      ? 'ca-app-pub-3940256099942544/1033173712'
-      : 'ca-app-pub-3940256099942544/4411468910';
+  // Google Test IDs (Used in debug/development mode to prevent publisher errors and avoid invalid traffic)
+  static const String _iosTestBannerId = 'ca-app-pub-3940256099942544/2934735716';
+  static const String _iosTestInterstitialId = 'ca-app-pub-3940256099942544/4411468910';
+  static const String _iosTestRewardedId = 'ca-app-pub-3940256099942544/1712485313';
+
+  // Android Test IDs (Replace with real Android ad units when created)
+  static const String _androidBannerId = 'ca-app-pub-3940256099942544/6300978111';
+  static const String _androidInterstitialId = 'ca-app-pub-3940256099942544/1033173712';
+  static const String _androidRewardedId = 'ca-app-pub-3940256099942544/5224354917';
+
+  String get bannerId => Platform.isAndroid
+      ? _androidBannerId
+      : (kDebugMode ? _iosTestBannerId : _iosBannerId);
+
+  String get interstitialId => Platform.isAndroid
+      ? _androidInterstitialId
+      : (kDebugMode ? _iosTestInterstitialId : _iosInterstitialId);
+
+  String get rewardedId => Platform.isAndroid
+      ? _androidRewardedId
+      : (kDebugMode ? _iosTestRewardedId : iosRewardedId);
 
   void loadBanner() {
     bannerAd?.dispose();
@@ -83,9 +105,11 @@ class HomeController extends GetxController {
       size: AdSize.banner,
       listener: BannerAdListener(
         onAdLoaded: (ad) {
+          debugPrint('✅ BannerAd loaded successfully');
           isBannerLoaded.value = true;
         },
         onAdFailedToLoad: (ad, err) {
+          debugPrint('❌ BannerAd failed to load: code ${err.code}, message: ${err.message}');
           ad.dispose();
           isBannerLoaded.value = false;
         },
@@ -98,8 +122,28 @@ class HomeController extends GetxController {
       adUnitId: interstitialId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) => interstitialAd = ad,
-        onAdFailedToLoad: (err) => interstitialAd = null,
+        onAdLoaded: (ad) {
+          debugPrint('✅ InterstitialAd loaded successfully');
+          interstitialAd = ad;
+          interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+            onAdDismissedFullScreenContent: (ad) {
+              debugPrint('Interstitial dismissed, preloading next ad');
+              ad.dispose();
+              interstitialAd = null;
+              loadInterstitial();
+            },
+            onAdFailedToShowFullScreenContent: (ad, err) {
+              debugPrint('❌ Interstitial failed to show: ${err.message}');
+              ad.dispose();
+              interstitialAd = null;
+              loadInterstitial();
+            },
+          );
+        },
+        onAdFailedToLoad: (err) {
+          debugPrint('❌ InterstitialAd failed to load: code ${err.code}, message: ${err.message}');
+          interstitialAd = null;
+        },
       ),
     );
   }
@@ -107,9 +151,57 @@ class HomeController extends GetxController {
   void showInterstitial() {
     if (interstitialAd != null) {
       interstitialAd!.show();
-      loadInterstitial();
     } else {
-      debugPrint("Interstitial Ad not ready yet");
+      debugPrint("Interstitial Ad not ready yet, loading new ad...");
+      loadInterstitial();
+    }
+  }
+
+  void loadRewarded() {
+    RewardedAd.load(
+      adUnitId: rewardedId,
+      request: const AdRequest(),
+      rewardedAdLoadCallback: RewardedAdLoadCallback(
+        onAdLoaded: (ad) {
+          debugPrint('✅ RewardedAd loaded successfully');
+          rewardedAd = ad;
+          isRewardedLoaded.value = true;
+          rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
+            onAdDismissedFullScreenContent: (ad) {
+              debugPrint('Rewarded ad dismissed, preloading next ad');
+              ad.dispose();
+              rewardedAd = null;
+              isRewardedLoaded.value = false;
+              loadRewarded();
+            },
+            onAdFailedToShowFullScreenContent: (ad, err) {
+              debugPrint('❌ Rewarded ad failed to show: ${err.message}');
+              ad.dispose();
+              rewardedAd = null;
+              isRewardedLoaded.value = false;
+              loadRewarded();
+            },
+          );
+        },
+        onAdFailedToLoad: (err) {
+          debugPrint('❌ RewardedAd failed to load: code ${err.code}, message: ${err.message}');
+          rewardedAd = null;
+          isRewardedLoaded.value = false;
+        },
+      ),
+    );
+  }
+
+  void showRewarded({required void Function(RewardItem reward) onUserEarnedReward}) {
+    if (rewardedAd != null) {
+      rewardedAd!.show(
+        onUserEarnedReward: (_, reward) {
+          onUserEarnedReward(reward);
+        },
+      );
+    } else {
+      debugPrint("Rewarded Ad not ready yet, loading new ad...");
+      loadRewarded();
     }
   }
 
@@ -143,6 +235,7 @@ class HomeController extends GetxController {
   void onClose() {
     bannerAd?.dispose();
     interstitialAd?.dispose();
+    rewardedAd?.dispose();
     mobileScannerController?.dispose();
     mobileScannerController = null;
     super.onClose();
@@ -179,16 +272,35 @@ class HomeController extends GetxController {
   }
 
   Future<bool> requestCameraPermission() async {
-    final status = await Permission.camera.request();
+    var status = await Permission.camera.status;
     if (status.isGranted) {
       return true;
-    } else {
-      Get.snackbar(
-        'Permission Denied',
-        'Camera access is required to scan QR codes',
+    }
+
+    status = await Permission.camera.request();
+    if (status.isGranted) {
+      return true;
+    }
+
+    if (status.isPermanentlyDenied || status.isRestricted) {
+      showCustomSnackBar(
+        title: 'Camera Access Needed',
+        message:
+            'Camera permission is required to scan QR codes. Please enable it in Settings.',
+        backgroundColor: AppColor.redColor,
+        isSuccess: false,
       );
+      await openAppSettings();
       return false;
     }
+
+    showCustomSnackBar(
+      title: 'Permission Denied',
+      message: 'Camera access is required to scan QR codes',
+      backgroundColor: AppColor.redColor,
+      isSuccess: false,
+    );
+    return false;
   }
 
   final storageHistory = GetStorage();
@@ -482,20 +594,40 @@ class HomeController extends GetxController {
     }
 
     try {
-      isScanning.value = true;
-      isScanning1.value = true;
       if (mobileScannerController == null) {
         initializeScanner();
       }
+      isScanning.value = true;
+      isScanning1.value = true;
 
       WidgetsBinding.instance.addPostFrameCallback((_) async {
-        await mobileScannerController!.start();
-        updateCameraZoom();
+        try {
+          if (mobileScannerController != null) {
+            await mobileScannerController!.start();
+            updateCameraZoom();
+          }
+        } catch (e) {
+          debugPrint('Error starting camera in post-frame callback: $e');
+          isScanning.value = false;
+          isScanning1.value = false;
+          showCustomSnackBar(
+            title: 'Scanner Error',
+            message: 'Could not start camera preview: $e',
+            backgroundColor: AppColor.redColor,
+            isSuccess: false,
+          );
+        }
       });
     } catch (e) {
+      debugPrint('Failed to initialize scanner: $e');
       isScanning.value = false;
       isScanning1.value = false;
-      Get.snackbar('Error', 'Failed to start scanner: $e');
+      showCustomSnackBar(
+        title: 'Error',
+        message: 'Failed to start scanner: $e',
+        backgroundColor: AppColor.redColor,
+        isSuccess: false,
+      );
       initializeScanner();
     }
   }
@@ -504,7 +636,7 @@ class HomeController extends GetxController {
     try {
       mobileScannerController?.stop();
     } catch (e) {
-      Get.snackbar('Error', 'Failed to stop scanner: $e');
+      debugPrint('Failed to stop scanner: $e');
     } finally {
       isScanning.value = false;
       isScanning1.value = false;
@@ -513,7 +645,11 @@ class HomeController extends GetxController {
 
   void copyToClipboard(String text) {
     Clipboard.setData(ClipboardData(text: text));
-    Get.snackbar('Success', 'Link copied to clipboard');
+    showCustomSnackBar(
+      title: 'Success',
+      message: 'Link copied to clipboard',
+      isSuccess: true,
+    );
   }
 
   @override
@@ -523,6 +659,7 @@ class HomeController extends GetxController {
     loadHistory();
     loadBanner();
     loadInterstitial();
+    loadRewarded();
     initializeScanner();
     loadScanCount();
     loadAdClickCount();
@@ -546,6 +683,12 @@ class HomeController extends GetxController {
     if (isLoading.value) return;
 
     try {
+      final token = await storage.read(key: 'access');
+      if (token == null || token.isEmpty) {
+        debugPrint("No access token found, skipping fetchHistory API request.");
+        return;
+      }
+
       if (!isLoadMore) {
         isLoading.value = true;
         historyItems.clear();
@@ -555,15 +698,13 @@ class HomeController extends GetxController {
         isLoading.value = true;
       }
 
-      final token = await storage.read(key: 'access');
-
       final String targetUrl = isLoadMore
           ? nextPageUrl.value!
           : AppUrl.historyUrl;
 
       debugPrint("🚀 Requesting URL: $targetUrl");
 
-      final response = await apiService.getHistory(token!, url: targetUrl);
+      final response = await apiService.getHistory(token, url: targetUrl);
 
       if (response['statusCode'] == 200) {
         final data = response['data'];
@@ -643,11 +784,10 @@ class HomeController extends GetxController {
       }
     } catch (e) {
       debugPrint('Error launching link: $e');
-      Get.snackbar(
-        'Error',
-        'Could not open link',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
+      showCustomSnackBar(
+        title: 'Error',
+        message: 'Could not open link',
+        isSuccess: false,
       );
     }
   }
@@ -1305,9 +1445,14 @@ class HomeController extends GetxController {
     try {
       mobileScannerController?.stop();
     } catch (e) {
-      Get.snackbar('Error', 'Failed to stop scanner: $e');
+      debugPrint('Failed to stop scanner: $e');
     }
-    Get.snackbar('Scanning Cancelled', 'Image scanning has been cancelled.');
+    showCustomSnackBar(
+      title: 'Scanning Cancelled',
+      message: 'Image scanning has been cancelled.',
+      backgroundColor: AppColor.orangeColor,
+      isSuccess: false,
+    );
   }
 
   Future<void> scanImageFromFile() async {
@@ -1447,7 +1592,11 @@ class HomeController extends GetxController {
         } else {
           final error = response['data']['error'];
           debugPrint('errors: $error');
-          Get.snackbar('Error', error ?? 'Failed to scan image');
+          showCustomSnackBar(
+            title: 'Error',
+            message: error ?? 'Failed to scan image',
+            isSuccess: false,
+          );
           selectedImage.value = Image.asset(
             ImageAssets.qrCode,
             fit: BoxFit.contain,
@@ -1455,11 +1604,19 @@ class HomeController extends GetxController {
         }
       } else {
         debugPrint('No image selected');
-        Get.snackbar('Error', 'No image selected');
+        showCustomSnackBar(
+          title: 'Error',
+          message: 'No image selected',
+          isSuccess: false,
+        );
       }
     } catch (e) {
       debugPrint('Error scanning image: $e');
-      Get.snackbar('Error', 'Failed to scan image: $e');
+      showCustomSnackBar(
+        title: 'Error',
+        message: 'Failed to scan image: $e',
+        isSuccess: false,
+      );
       selectedImage.value = Image.asset(
         ImageAssets.qrCode,
         fit: BoxFit.contain,

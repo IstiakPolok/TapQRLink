@@ -10,14 +10,17 @@ import '../../../../res/colors/app_color.dart';
 import '../../../../widgets/custom_button.dart';
 import '../../../../widgets/show_custom_snack_bar.dart';
 import '../../auth/controllers/auth_controller.dart';
+import '../controllers/revenue_cat_controller.dart';
 import '../controllers/settings_controller.dart';
-import 'paywall_page.dart';
-import 'purchasea_api.dart';
+import '../models/entitlement.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 
 class UpgradeView extends GetView<SettingsController> {
   const UpgradeView({super.key});
   @override
   Widget build(BuildContext context) {
+    controller.fetchOfferings();
+    final revenueCatController = Get.find<RevenueCatController>();
     return Obx(
       () => Scaffold(
         appBar: AppBar(
@@ -65,8 +68,102 @@ class UpgradeView extends GetView<SettingsController> {
                           height: 303.h,
                         ),
                       ),
-                      SizedBox(height: 30.h),
-                      plan(context, '1 Year', 35.99, 'Yearly', 1),
+                      SizedBox(height: 20.h),
+                      Obx(() {
+                        if (revenueCatController.entitlement == Entitlement.allFeatures || controller.isPremium.value) {
+                          return Container(
+                            width: double.infinity,
+                            margin: EdgeInsets.only(bottom: 20.h),
+                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                            decoration: BoxDecoration(
+                              color: AppColor.defaultColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(12.r),
+                              border: Border.all(color: AppColor.defaultColor),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.check_circle, color: AppColor.defaultColor, size: 24.sp),
+                                SizedBox(width: 10.w),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Active Premium Subscription',
+                                        style: TextStyle(
+                                          color: controller.isDarkMode.value
+                                              ? AppColor.whiteColor
+                                              : AppColor.textColor,
+                                          fontSize: 15.sp,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      if (revenueCatController.renewalDate.isNotEmpty)
+                                        Text(
+                                          'Renewal Date: ${revenueCatController.renewalDate}',
+                                          style: TextStyle(
+                                            color: controller.isDarkMode.value
+                                                ? AppColor.whiteColor.withValues(alpha: 0.8)
+                                                : AppColor.textColor2,
+                                            fontSize: 12.sp,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      }),
+                      Obx(() {
+                        final offeringsObj = controller.offerings.value;
+                        if (offeringsObj == null) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20.0),
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        }
+                        final currentOffering = offeringsObj.current;
+                        if (currentOffering == null ||
+                            currentOffering.availablePackages.isEmpty) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20.0),
+                              child: Text(
+                                'No subscription plans available.',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                            ),
+                          );
+                        }
+                        final packages = currentOffering.availablePackages;
+                        return Column(
+                          children: List.generate(packages.length, (index) {
+                            final package = packages[index];
+                            final title = package.packageType == PackageType.annual
+                                ? '1 Year'
+                                : package.packageType == PackageType.monthly
+                                    ? '1 Month'
+                                    : package.storeProduct.title;
+                            final priceString = package.storeProduct.priceString;
+                            final duration = package.packageType == PackageType.annual
+                                ? 'Yearly'
+                                : package.packageType == PackageType.monthly
+                                    ? 'Monthly'
+                                    : 'Subscription';
+                            return Column(
+                              children: [
+                                plan(context, title, priceString, duration, index, package),
+                                if (index < packages.length - 1) SizedBox(height: 25.h),
+                              ],
+                            );
+                          }),
+                        );
+                      }),
                       SizedBox(height: 25.h),
                       Text(
                         'Premium Features',
@@ -118,7 +215,70 @@ class UpgradeView extends GetView<SettingsController> {
                           ),
                         ],
                       ),
-                      SizedBox(height: 20.h),
+                      SizedBox(height: 30.h),
+                      Center(
+                        child: TextButton(
+                          onPressed: () => controller.restorePurchases(),
+                          child: Text(
+                            'Restore Purchases',
+                            style: TextStyle(
+                              color: AppColor.defaultColor,
+                              fontSize: 14.sp,
+                              fontFamily: 'Nunito Sans',
+                              fontWeight: FontWeight.w700,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 10.h),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          GestureDetector(
+                            onTap: () => _launchURL('https://tapqrlink.com/privacy-policy'),
+                            child: Text(
+                              'Privacy Policy',
+                              style: TextStyle(
+                                color: controller.isDarkMode.value == false
+                                    ? AppColor.textColor1
+                                    : AppColor.whiteColor.withValues(alpha: 0.7),
+                                fontSize: 12.sp,
+                                fontFamily: 'Nunito Sans',
+                                fontWeight: FontWeight.w500,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 12.w),
+                            child: Text(
+                              '|',
+                              style: TextStyle(
+                                color: controller.isDarkMode.value == false
+                                    ? AppColor.textColor2
+                                    : AppColor.whiteColor.withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => _launchURL('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/'),
+                            child: Text(
+                              'Terms of Use (EULA)',
+                              style: TextStyle(
+                                color: controller.isDarkMode.value == false
+                                    ? AppColor.textColor1
+                                    : AppColor.whiteColor.withValues(alpha: 0.7),
+                                fontSize: 12.sp,
+                                fontFamily: 'Nunito Sans',
+                                fontWeight: FontWeight.w500,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 30.h),
                     ],
                   ),
                 ),
@@ -162,11 +322,28 @@ class UpgradeView extends GetView<SettingsController> {
       }
     } catch (e) {
       debugPrint('Error sending email: $e');
-      Get.snackbar(
-        'Error',
-        'An error occurred while trying to open the email client.',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
+      showCustomSnackBar(
+        title: 'Error',
+        message: 'An error occurred while trying to open the email client.',
+        isSuccess: false,
+      );
+    }
+  }
+
+  Future<void> _launchURL(String urlString) async {
+    final Uri url = Uri.parse(urlString);
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(url, mode: LaunchMode.platformDefault);
+      }
+    } catch (e) {
+      debugPrint('Error launching URL: $e');
+      showCustomSnackBar(
+        title: 'Error',
+        message: 'Could not open link.',
+        isSuccess: false,
       );
     }
   }
@@ -174,14 +351,24 @@ class UpgradeView extends GetView<SettingsController> {
   Widget plan(
     BuildContext context,
     String title,
-    double price,
+    String priceString,
     String duration,
     int index,
+    Package package,
   ) {
+    final revenueCatController = Get.find<RevenueCatController>();
     return GestureDetector(
       onTap: () {
+        if (revenueCatController.entitlement == Entitlement.allFeatures || controller.isPremium.value) {
+          showCustomSnackBar(
+            title: 'Already Subscribed',
+            message: 'You already have an active Premium subscription.',
+            isSuccess: true,
+          );
+          return;
+        }
         controller.selectedPlanIndex.value = index;
-        showUpgradeDialog(context);
+        showUpgradeDialog(context, package);
       },
       child: Obx(
         () => Container(
@@ -218,7 +405,7 @@ class UpgradeView extends GetView<SettingsController> {
                     ),
                   ),
                   Text(
-                    'Total Price- \$$price',
+                    'Total Price- $priceString',
                     style: TextStyle(
                       color: controller.selectedPlanIndex.value == index
                           ? AppColor.whiteColor
@@ -236,7 +423,7 @@ class UpgradeView extends GetView<SettingsController> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '\$$price',
+                    priceString,
                     textAlign: TextAlign.right,
                     style: TextStyle(
                       color: controller.selectedPlanIndex.value == index
@@ -291,7 +478,7 @@ class UpgradeView extends GetView<SettingsController> {
     );
   }
 
-  void showUpgradeDialog(BuildContext context) {
+  void showUpgradeDialog(BuildContext context, Package package) {
     final AuthController authController = Get.find();
     Get.dialog(
       AlertDialog(
@@ -323,7 +510,9 @@ class UpgradeView extends GetView<SettingsController> {
               children: [
                 CustomButton(
                   onPress: () async {
-                    Navigator.pop(Get.context!);
+                    if (Get.isDialogOpen == true) {
+                      Get.back();
+                    }
                   },
                   title: 'Cancel',
                   textColor: AppColor.defaultColor,
@@ -337,13 +526,15 @@ class UpgradeView extends GetView<SettingsController> {
                 ),
                 CustomButton(
                   onPress: () async {
-                    Navigator.pop(Get.context!);
+                    if (Get.isDialogOpen == true) {
+                      Get.back();
+                    }
                     if (authController.isLoggedIn.value ||
                         authController.isSignedIn.value) {
-                      await fetchOffers(context);
+                      await controller.purchasePackage(package);
                     } else {
                       showCustomSnackBar(
-                        title: 'Lon In First',
+                        title: 'Log In First',
                         message: 'Create An Account First Then Purchase',
                         isSuccess: false,
                       );
@@ -361,41 +552,5 @@ class UpgradeView extends GetView<SettingsController> {
         ),
       ),
     );
-  }
-
-  Future<void> fetchOffers(BuildContext context) async {
-    final offerings = await PurchaseApi.fetchOffers();
-    if (offerings.isEmpty) {
-      ScaffoldMessenger.of(
-        Get.context!,
-      ).showSnackBar(const SnackBar(content: Text('No offers found')));
-      return;
-    }
-
-    final packages = offerings
-        .map((offer) => offer.availablePackages)
-        .expand((element) => element)
-        .toList();
-
-    Get.bottomSheet(
-      Padding(
-        padding: EdgeInsets.symmetric(vertical: 10.h),
-        child: PaywallPage(
-          packages: packages,
-          title: 'Upgrade to Premium',
-          description: 'Unlock Premium Features',
-          onPackageSelected: (package) async {
-            await PurchaseApi.purchasePackage(context, package);
-            Navigator.pop(Get.context!);
-          },
-        ),
-      ),
-
-      backgroundColor: Colors.white,
-      isScrollControlled: true,
-    );
-
-    final offer = offerings.first;
-    debugPrint('Offer: $offer');
   }
 }

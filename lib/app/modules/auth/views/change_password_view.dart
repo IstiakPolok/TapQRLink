@@ -66,7 +66,7 @@ class ChangePasswordView extends StatelessWidget {
                   children: [
                     SizedBox(height: 20.h),
                     Text(
-                      origin == 'Signup' ? 'Set Password?' : 'Reset Password?',
+                      origin == 'Signup' ? 'Set Password ' : 'Reset Password?',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: settingsController.isDarkMode.value == false

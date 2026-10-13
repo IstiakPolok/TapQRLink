@@ -51,7 +51,7 @@ class SuccessfullyView extends GetView {
               padding: EdgeInsets.symmetric(horizontal: 20.w),
               child: CustomButton(
                 onPress: () async {
-                  Get.to(Navbar());
+                  Get.offAll(() => Navbar());
                 },
                 title: 'Skip',
                 width: 105,

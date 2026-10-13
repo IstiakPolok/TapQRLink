@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -16,10 +17,33 @@ class NotificationService extends GetxService {
 
   FirebaseMessaging messaging = FirebaseMessaging.instance;
 
+  Future<String?> _getFcmTokenSafely() async {
+    try {
+      if (Platform.isIOS) {
+        String? apnsToken = await messaging.getAPNSToken();
+        int retries = 0;
+        while (apnsToken == null && retries < 10) {
+          debugPrint('Waiting for APNS token... Attempt $retries');
+          await Future.delayed(const Duration(milliseconds: 500));
+          apnsToken = await messaging.getAPNSToken();
+          retries++;
+        }
+        if (apnsToken == null) {
+          debugPrint('APNS token could not be retrieved. FCM token might fail.');
+          return null;
+        }
+      }
+      return await messaging.getToken();
+    } catch (e, stackTrace) {
+      debugPrint('Error fetching FCM token safely: $e\n$stackTrace');
+      return null;
+    }
+  }
+
   Future<String> getDeviceToken() async {
-    String? token = await messaging.getToken();
+    String? token = await _getFcmTokenSafely();
     debugPrint('DEVICE token :::::::::::::::::::::::::::    $token');
-    return token!;
+    return token ?? '';
   }
 
   static Future<void> requestNotificationPermission() async {
@@ -102,9 +126,9 @@ class NotificationService extends GetxService {
 
   Future<void> _registerFcmToken({String? fcmToken}) async {
     try {
-      final token = fcmToken ?? await _messaging.getToken();
-      if (token == null) {
-        debugPrint('FCM token is null');
+      final token = fcmToken ?? await _getFcmTokenSafely();
+      if (token == null || token.isEmpty) {
+        debugPrint('FCM token is null or empty');
         return;
       }
       debugPrint('FCM token: $token');
@@ -251,11 +275,14 @@ class NotificationService extends GetxService {
         _handleMessage(message);
       });
 
-      final initialMessage = await _messaging.getInitialMessage();
-      if (initialMessage != null) {
-        debugPrint('Initial message: ${initialMessage.data}');
-        _handleMessage(initialMessage);
-      }
+      _messaging.getInitialMessage().then((initialMessage) {
+        if (initialMessage != null) {
+          debugPrint('Initial message: ${initialMessage.data}');
+          _handleMessage(initialMessage);
+        }
+      }).catchError((e) {
+        debugPrint('Error getting initial message: $e');
+      });
     } catch (e, stackTrace) {
       debugPrint('Error setting up message handlers: $e');
       debugPrint('Stack trace: $stackTrace');
