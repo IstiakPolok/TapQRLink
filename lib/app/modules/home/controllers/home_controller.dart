@@ -48,6 +48,22 @@ class HomeController extends GetxController {
   final sliderValue = 50.0.obs;
   final isScanning = false.obs;
   final isScanning1 = false.obs;
+
+  // Helper method to request gallery/storage permission
+  Future<bool> _requestGalleryPermission() async {
+    // For iOS photo library permission
+    var photoStatus = await Permission.photos.status;
+    if (!photoStatus.isGranted) {
+      photoStatus = await Permission.photos.request();
+    }
+    // For Android storage permission (covers legacy and scoped storage)
+    var storageStatus = await Permission.storage.status;
+    if (!storageStatus.isGranted) {
+      storageStatus = await Permission.storage.request();
+    }
+    return photoStatus.isGranted && storageStatus.isGranted;
+  }
+
   final qrCode = ''.obs;
   final Rx<Image> selectedImage = Rx<Image>(
     Image.asset(ImageAssets.qrCode, fit: BoxFit.contain),
@@ -1457,6 +1473,16 @@ class HomeController extends GetxController {
 
   Future<void> scanImageFromFile() async {
     debugPrint('Attempting to scan image from file');
+    // Request permission before opening gallery
+    bool permissionGranted = await _requestGalleryPermission();
+    if (!permissionGranted) {
+      _showSnackBar(
+        title: 'Permission Denied',
+        message: 'Gallery permission is required to select images.',
+        isSuccess: false,
+      );
+      return;
+    }
 
     try {
       isLoading.value = true;
@@ -1570,6 +1596,16 @@ class HomeController extends GetxController {
 
   Future<void> scanImageFromFile1() async {
     debugPrint('Attempting to scan image from file1');
+    // Request permission before opening gallery
+    bool permissionGranted = await _requestGalleryPermission();
+    if (!permissionGranted) {
+      _showSnackBar(
+        title: 'Permission Denied',
+        message: 'Gallery permission is required to select images.',
+        isSuccess: false,
+      );
+      return;
+    }
 
     try {
       isLoading(true);

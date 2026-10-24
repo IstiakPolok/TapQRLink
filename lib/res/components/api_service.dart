@@ -839,4 +839,37 @@ class ApiService extends GetxService {
       return {'statusCode': 500, 'data': {'error': e.toString()}};
     }
   }
+
+  Future<Map<String, dynamic>> deleteAccount({
+    required String accessToken,
+    required String refreshToken,
+  }) async {
+    final url = Uri.parse(AppUrl.deleteAccountUrl);
+    try {
+      final headers = {
+        'Authorization': 'Bearer $accessToken',
+        'Content-Type': 'application/json',
+      };
+      final body = jsonEncode({
+        'refresh': refreshToken,
+      });
+      debugPrint('Request: DELETE $url');
+      debugPrint('Headers: $headers');
+      debugPrint('Body: $body');
+      final response = await http.delete(
+        url,
+        headers: headers,
+        body: body,
+      );
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
+      final responseData = response.body.isNotEmpty
+          ? jsonDecode(response.body)
+          : {};
+      return {'statusCode': response.statusCode, 'data': responseData};
+    } catch (e) {
+      debugPrint('deleteAccount error: $e');
+      return {'statusCode': 500, 'data': {'error': e.toString()}};
+    }
+  }
 }

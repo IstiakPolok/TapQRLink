@@ -13,6 +13,7 @@ import '../../../../res/components/api_service.dart';
 import '../../../../widgets/show_custom_snack_bar.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../models/entitlement.dart';
+import 'settings_controller.dart';
 
 class RevenueCatController extends GetxController {
   final _entitlement = Entitlement.free.obs;
@@ -104,14 +105,35 @@ class RevenueCatController extends GetxController {
     init();
   }
 
-  Future<void> init() async {
+  Future<void> init({String? appUserId}) async {
     while (!await Purchases.isConfigured) {
       await Future.delayed(const Duration(milliseconds: 100));
     }
     Purchases.addCustomerInfoUpdateListener((customerInfo) {
       updatePurchaseStatus(info: customerInfo);
     });
-    await updatePurchaseStatus();
+
+    final targetUserId = appUserId ?? await storage.read(key: 'email');
+    if (targetUserId != null && targetUserId.trim().isNotEmpty) {
+      await logInUser(targetUserId.trim());
+    } else {
+      await updatePurchaseStatus();
+    }
+  }
+
+  Future<void> logInUser(String appUserId) async {
+    try {
+      while (!await Purchases.isConfigured) {
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+      if (appUserId.trim().isEmpty) return;
+      debugPrint("RevenueCat: Identifying user with ID: $appUserId");
+      final LogInResult result = await Purchases.logIn(appUserId.trim().toLowerCase());
+      await updatePurchaseStatus(info: result.customerInfo);
+    } catch (e) {
+      debugPrint("Error logging into RevenueCat: $e");
+      await updatePurchaseStatus();
+    }
   }
 
   Future<void> updatePurchaseStatus({CustomerInfo? info}) async {
@@ -125,8 +147,14 @@ class RevenueCatController extends GetxController {
         _renewalDate.value = '';
         _activeProductName.value = '';
         _activeProductPriceString.value = '';
+        if (Get.isRegistered<SettingsController>()) {
+          Get.find<SettingsController>().isPremium.value = false;
+        }
       } else {
         _entitlement.value = Entitlement.allFeatures;
+        if (Get.isRegistered<SettingsController>()) {
+          Get.find<SettingsController>().isPremium.value = true;
+        }
         final entitlementInfo = activeEntitlements.values.first;
 
         if (entitlementInfo.expirationDate != null) {
@@ -243,7 +271,12 @@ class RevenueCatController extends GetxController {
 
       _entitlement.value = Entitlement.free;
       _renewalDate.value = '';
+      _activeProductName.value = '';
+      _activeProductPriceString.value = '';
       _lastSyncedDate = 'INITIAL';
+      if (Get.isRegistered<SettingsController>()) {
+        Get.find<SettingsController>().isPremium.value = false;
+      }
     } catch (e) {
       debugPrint("Error clearing RevenueCat data: $e");
     }

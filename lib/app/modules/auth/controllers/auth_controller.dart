@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:qr_code/app/modules/home/controllers/home_controller.dart';
 import 'package:qr_code/app/modules/settings/controllers/revenue_cat_controller.dart';
@@ -144,6 +143,12 @@ class AuthController extends GetxController {
           isLoggedIn.value = true;
           isSignedIn.value = true;
           debugPrint('Valid token found, user is logged in');
+          final storedEmail = await _readFromStorage('email');
+          if (storedEmail != null && storedEmail.trim().isNotEmpty) {
+            revenueCatController.logInUser(storedEmail.trim());
+          } else {
+            revenueCatController.init();
+          }
         } else {
           isLoggedIn.value = false;
           isSignedIn.value = true;
@@ -157,6 +162,12 @@ class AuthController extends GetxController {
           isLoggedIn.value = true;
           isSignedIn.value = true;
           debugPrint('Token was refreshed and user is now logged in');
+          final storedEmail = await _readFromStorage('email');
+          if (storedEmail != null && storedEmail.trim().isNotEmpty) {
+            revenueCatController.logInUser(storedEmail.trim());
+          } else {
+            revenueCatController.init();
+          }
         } else {
           isLoggedIn.value = false;
           debugPrint('Failed to refresh token');
@@ -505,6 +516,7 @@ class AuthController extends GetxController {
         }
         await _writeToStorage('access', accessToken);
         await _writeToStorage('refresh', refreshToken ?? '');
+        await _writeToStorage('email', email.trim());
         this.accessToken.value = accessToken;
         this.refreshToken.value = refreshToken ?? '';
 
@@ -529,7 +541,7 @@ class AuthController extends GetxController {
         showCustomSnackBar(title: 'Success', message: message, isSuccess: true);
         isSignedIn.value = true;
         await fcmRegister(fcmToken);
-        revenueCatController.init();
+        await revenueCatController.logInUser(email.trim());
         Get.offAll(() => Navbar(), transition: Transition.fadeIn);
 
         debugPrint(
@@ -624,6 +636,7 @@ class AuthController extends GetxController {
         await _writeToStorage('access', accessToken);
         await _writeToStorage('refresh', refreshToken ?? '');
         await _writeToStorage('user_id', userID.toString());
+        await _writeToStorage('email', email);
         this.accessToken.value = accessToken;
         userId.value = userID.toString();
         this.refreshToken.value = refreshToken ?? '';
@@ -631,7 +644,7 @@ class AuthController extends GetxController {
         isLoggedIn.value = true;
         isSignedIn.value = true;
         await fcmRegister(await _notificationService.getDeviceToken());
-        revenueCatController.init();
+        await revenueCatController.logInUser(email);
         Get.offAll(() => Navbar(), transition: Transition.fadeIn);
       } else {
         final errorMsg =
@@ -796,6 +809,9 @@ class AuthController extends GetxController {
         await _writeToStorage('access', accessToken ?? '');
         await _writeToStorage('refresh', refreshToken ?? '');
         await _writeToStorage('user_id', userID.toString());
+        if (email.isNotEmpty) {
+          await _writeToStorage('email', email.trim());
+        }
         final token = await _readFromStorage('access');
         final refreshTokenValue = await _readFromStorage('refresh');
         final userId = await _readFromStorage('user_id');
@@ -855,6 +871,9 @@ class AuthController extends GetxController {
         await _writeToStorage('access', accessToken ?? '');
         await _writeToStorage('refresh', refreshToken ?? '');
         await _writeToStorage('user_id', userID.toString());
+        if (email.isNotEmpty) {
+          await _writeToStorage('email', email.trim());
+        }
         final token = await _readFromStorage('access');
         final refreshTokenValue = await _readFromStorage('refresh');
         final userId = await _readFromStorage('user_id');
@@ -1004,11 +1023,16 @@ class AuthController extends GetxController {
         isSignedIn.value = true;
         isLoggedIn.value = true;
         await fcmRegister(await _notificationService.getDeviceToken());
+        final storedEmail = await _readFromStorage('email');
+        if (storedEmail != null && storedEmail.trim().isNotEmpty) {
+          await revenueCatController.logInUser(storedEmail.trim());
+        } else {
+          revenueCatController.init();
+        }
         final origin = Get.arguments?['origin'] as String?;
         if (origin == 'Signup' && verify == 'no') {
           Get.offAllNamed(Routes.onboarding, arguments: {'origin': 'Signup'});
         } else if (origin == 'Forget' && verify == 'yes') {
-          revenueCatController.init();
           Get.offAll(() => Navbar(), transition: Transition.noTransition);
         }
       } else if (response['statusCode'] == 401) {
@@ -1047,6 +1071,12 @@ class AuthController extends GetxController {
               isSignedIn.value = true;
               isLoggedIn.value = true;
               await fcmRegister(await _notificationService.getDeviceToken());
+              final storedEmail = await _readFromStorage('email');
+              if (storedEmail != null && storedEmail.trim().isNotEmpty) {
+                await revenueCatController.logInUser(storedEmail.trim());
+              } else {
+                revenueCatController.init();
+              }
               final origin = Get.arguments?['origin'] as String?;
               if (origin == 'Signup' && verify == 'no') {
                 Get.offAllNamed(
@@ -1054,7 +1084,6 @@ class AuthController extends GetxController {
                   arguments: {'origin': 'Signup'},
                 );
               } else if (origin == 'Forget' && verify == 'yes') {
-                revenueCatController.init();
                 Get.offAll(() => Navbar(), transition: Transition.noTransition);
               }
             } else {
@@ -1248,14 +1277,6 @@ class AuthController extends GetxController {
 
       debugPrint('Cleared all local storage instances');
 
-      try {
-        if (await Purchases.isConfigured) {
-          await Purchases.logOut();
-          debugPrint('RevenueCat logged out');
-        }
-      } catch (e) {
-        debugPrint('RevenueCat logout error: $e');
-      }
 
       await _auth.signOut();
       await googleSignIn.signOut();
@@ -1288,8 +1309,49 @@ class AuthController extends GetxController {
     debugPrint('Deleting account and clearing all data');
     try {
       isLoading.value = true;
-      
-      // Delete Firebase Auth user if present
+
+      // 1. Call Backend DELETE /delete-account/ API
+      String? access = await storage.read(key: 'access');
+      String? refresh = await storage.read(key: 'refresh');
+
+      if (access != null && access.isNotEmpty) {
+        var response = await apiService.deleteAccount(
+          accessToken: access,
+          refreshToken: refresh ?? '',
+        );
+
+        // If 401 Unauthorized, try refreshing token once
+        if (response['statusCode'] == 401 &&
+            refresh != null &&
+            refresh.isNotEmpty) {
+          final refreshed = await refreshAccessToken(refresh);
+          if (refreshed) {
+            access = await storage.read(key: 'access');
+            if (access != null && access.isNotEmpty) {
+              response = await apiService.deleteAccount(
+                accessToken: access,
+                refreshToken: refresh,
+              );
+            }
+          }
+        }
+
+        debugPrint(
+          'Delete account API response status: ${response['statusCode']}',
+        );
+        if (response['statusCode'] != 200 &&
+            response['statusCode'] != 204 &&
+            response['statusCode'] != 201 &&
+            response['statusCode'] != 202) {
+          final errorMsg = response['data']?['detail'] ??
+              response['data']?['error'] ??
+              response['data']?['message'] ??
+              'Failed to delete account on server.';
+          debugPrint('Backend delete account error: $errorMsg');
+        }
+      }
+
+      // 2. Delete Firebase Auth user if present
       try {
         User? user = _auth.currentUser;
         if (user != null) {
@@ -1301,7 +1363,8 @@ class AuthController extends GetxController {
         if (e.code == 'requires-recent-login') {
           showCustomSnackBar(
             title: 'Action Required',
-            message: 'Please re-authenticate / log in again to delete your account.',
+            message:
+                'Please re-authenticate / log in again to delete your account.',
             isSuccess: false,
           );
           await logout();
@@ -1325,13 +1388,6 @@ class AuthController extends GetxController {
         await Get.find<HomeController>().storageHistory.erase();
       }
 
-      try {
-        if (await Purchases.isConfigured) {
-          await Purchases.logOut();
-        }
-      } catch (e) {
-        debugPrint('RevenueCat logout error: $e');
-      }
 
       try {
         await googleSignIn.signOut();
@@ -1452,7 +1508,9 @@ class AuthController extends GetxController {
       Get.find<NotificationController>().notifications.clear();
     }
     if (Get.isRegistered<SettingsController>()) {
-      Get.find<SettingsController>().count.value = 0;
+      final settings = Get.find<SettingsController>();
+      settings.count.value = 0;
+      settings.isPremium.value = false;
     }
   }
 

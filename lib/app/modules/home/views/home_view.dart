@@ -52,7 +52,8 @@ class HomeView extends GetView<HomeController> {
                     Obx(() {
                       bool showAd =
                           (revenueCatController.renewalDate.isEmpty &&
-                              revenueCatController.entitlement != Entitlement.allFeatures);
+                          revenueCatController.entitlement !=
+                              Entitlement.allFeatures);
 
                       if (showAd) {
                         return BannerAdWidget(adUnitId: controller.bannerId);
@@ -62,7 +63,8 @@ class HomeView extends GetView<HomeController> {
                     SizedBox(height: 15.h),
                     Obx(() {
                       if (revenueCatController.renewalDate.isEmpty &&
-                          revenueCatController.entitlement != Entitlement.allFeatures) {
+                          revenueCatController.entitlement !=
+                              Entitlement.allFeatures) {
                         return CustomButton(
                           onPress: () async {
                             authController.isSignedIn.value ||
@@ -215,17 +217,19 @@ class HomeView extends GetView<HomeController> {
                       ),
                     ),
                     SizedBox(height: 15.h),
+
                     CustomButton(
                       onPress: () async {
                         debugPrint(
                           'Ad Click Count: ${controller.adClickCount.value}',
                         );
 
-                         bool isPremium =
+                        bool isPremium =
                             (authController.isLoggedIn.value ||
                                 authController.isSignedIn.value) &&
                             (revenueCatController.renewalDate.isNotEmpty ||
-                                revenueCatController.entitlement == Entitlement.allFeatures);
+                                revenueCatController.entitlement ==
+                                    Entitlement.allFeatures);
 
                         if (controller.adClickCount.value > 0 &&
                             !isPremium &&
@@ -240,6 +244,7 @@ class HomeView extends GetView<HomeController> {
                       leadingIcon: ImageAssets.file,
                       loading: controller.isLoading.value,
                     ),
+
                     SizedBox(height: 20.h),
                   ],
                 ),

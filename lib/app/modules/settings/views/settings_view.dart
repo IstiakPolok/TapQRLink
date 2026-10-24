@@ -7,6 +7,7 @@ import 'package:qr_code/app/routes/app_pages.dart';
 import 'package:shimmer/shimmer.dart';
 
 import '../../../../res/assets/image_assets.dart';
+import 'privacy_policy_view.dart';
 import '../../../../res/colors/app_color.dart';
 import '../../../../widgets/custom_button.dart';
 import '../../../../widgets/show_custom_snack_bar.dart';
@@ -141,20 +142,29 @@ class SettingsView extends GetView<SettingsController> {
                             }
 
                             final profile = profileController.profile.value;
-                            String displayName = '${profile?.firstName ?? ''} ${profile?.lastName ?? ''}'.trim();
+                            String displayName =
+                                '${profile?.firstName ?? ''} ${profile?.lastName ?? ''}'
+                                    .trim();
                             if (displayName.isEmpty) {
-                              displayName = '${profileController.firstname.value} ${profileController.lastName.value}'.trim();
+                              displayName =
+                                  '${profileController.firstname.value} ${profileController.lastName.value}'
+                                      .trim();
                             }
                             if (displayName.isEmpty) {
-                              displayName = profileController.firstname.value.trim();
+                              displayName = profileController.firstname.value
+                                  .trim();
                             }
-                            if (displayName.isEmpty && profile?.email != null && profile!.email.isNotEmpty) {
+                            if (displayName.isEmpty &&
+                                profile?.email != null &&
+                                profile!.email.isNotEmpty) {
                               final raw = profile.email.split('@').first;
                               displayName = raw
                                   .replaceAll(RegExp(r'[\._\-]'), ' ')
                                   .split(' ')
                                   .where((s) => s.isNotEmpty)
-                                  .map((s) => s[0].toUpperCase() + s.substring(1))
+                                  .map(
+                                    (s) => s[0].toUpperCase() + s.substring(1),
+                                  )
                                   .join(' ');
                             }
                             if (displayName.isEmpty) {
@@ -195,13 +205,20 @@ class SettingsView extends GetView<SettingsController> {
                               ? SubscriptionView()
                               : AuthView(),
                         ),
+                        SizedBox(height: 20.h),
+                        item(
+                          'Privacy Policy',
+                          ImageAssets.info,
+                          false,
+                          PrivacyPolicyView(),
+                        ),
                         SizedBox(height: 13.h),
                         item('Dark Mode', ImageAssets.dark, true, null),
                       ],
                     ),
                   ],
                 ),
-                 authController.isSignedIn.value == true ||
+                authController.isSignedIn.value == true ||
                         authController.isLoggedIn.value == true
                     ? Column(
                         children: [

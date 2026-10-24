@@ -9,6 +9,7 @@ import '../../../../widgets/show_custom_snack_bar.dart';
 import '../../../routes/app_pages.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../settings/models/profile.dart';
+import 'revenue_cat_controller.dart';
 
 class ProfileController extends GetxController {
   final ApiService apiService = Get.find<ApiService>();
@@ -112,6 +113,13 @@ class ProfileController extends GetxController {
     bio.value = prof?.bio ?? '';
     mobile.value = prof?.mobileNumber ?? '';
     profilePicture.value = prof?.profilePicture ?? '';
+
+    if (userEmail.isNotEmpty) {
+      await storage.write(key: 'email', value: userEmail);
+      if (Get.isRegistered<RevenueCatController>()) {
+        Get.find<RevenueCatController>().logInUser(userEmail);
+      }
+    }
 
     firstnameController.text = fname;
     lastNameController.text = lname;

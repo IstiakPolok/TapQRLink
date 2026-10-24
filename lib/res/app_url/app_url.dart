@@ -26,6 +26,5 @@ class AppUrl {
   static const String registerFcmTokenUrl = '$_baseUrl/fcm/register/';
   static const String getChatsUrl = '$_baseUrl/chat/rooms/';
   static const String refreshUrl = '$_baseUrl/api/token/refresh/';
-
-
+  static const String deleteAccountUrl = '$_baseUrl/delete-account/';
 }
